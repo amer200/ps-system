@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+    <title>نظام إدارة البلايستيشن</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .room-card {
+            transition: 0.3s;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .room-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-available {
+            background-color: #d1e7dd;
+            border-color: #badbcc;
+            color: #0f5132;
+        }
+        
+        .status-busy {
+            background-color: #f8d7da;
+            border-color: #f5c2c7;
+            color: #842029;
+        }
+        
+        .timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body class="p-4">
+
+    <div class="container">
+        <h2 class="text-center mb-4 text-dark">شاشة المراقبة الرئيسية</h2>
+
+        <div id="rooms-container" class="row g-4">
+        </div>
+    </div>
+
+    <script>
+        const {
+            ipcRenderer
+        } = require('electron');
+        let activeRooms = {}; // هنا هنحفظ وقت بداية كل غرفة شغالة
+
+        // 1. دالة لتنسيق الثواني لشكل (ساعات:دقائق:ثواني)
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        // 2. تحديث الشاشة كل ثانية
+        setInterval(() => {
+            const now = new Date();
+            for (let i = 1; i <= 6; i++) {
+                const roomCard = document.getElementById(`room-${i}`);
+                const timerDiv = roomCard.querySelector('.timer');
+
+                if (activeRooms[i]) {
+                    // تحويل توقيت قاعدة البيانات لتوقيت يفهمه الجافاسكريبت
+                    const startTime = new Date(activeRooms[i].replace(' ', 'T'));
+                    const diffInSeconds = Math.floor((now - startTime) / 1000);
+                    timerDiv.innerText = formatTime(diffInSeconds);
+                } else {
+                    timerDiv.innerText = "00:00:00";
+                }
+            }
+        }, 1000);
+
+        // 3. دالة رسم الغرف وتحديث حالتها
+        function renderRooms() {
+            const container = document.getElementById('rooms-container');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 6; i++) {
+                const isBusy = activeRooms[i] !== undefined;
+                const statusClass = isBusy ? 'status-busy' : 'status-available';
+                const statusText = isBusy ? 'مشغول' : 'متاح';
+
+                container.innerHTML += `
+                <div class="col-md-4">
+                    <div class="card room-card ${statusClass} text-center p-4" id="room-${i}">
+                        <h3 class="card-title">غرفة ${i}</h3>
+                        <p class="card-text mb-1 fw-bold">${statusText}</p>
+                        <div class="timer">00:00:00</div>
+                    </div>
+                </div>
+            `;
+            }
+        }
+
+        // 4. استرجاع الجلسات النشطة عند فتح البرنامج
+        ipcRenderer.invoke('get-active-sessions').then((sessions) => {
+            sessions.forEach(session => {
+                activeRooms[session.room_id] = session.start_time;
+            });
+            renderRooms();
+        });
+
+        // 5. نظام التقاط الباركود
+        let barcodeBuffer = '';
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const roomId = parseInt(barcodeBuffer);
+                if (roomId >= 1 && roomId <= 6) {
+                    ipcRenderer.invoke('toggle-room', roomId).then((res) => {
+                        if (res.status === 'started') {
+                            activeRooms[roomId] = res.startTime; // إضافة الغرفة للعداد
+                        } else {
+                            delete activeRooms[roomId]; // إزالة الغرفة من العداد
+                        }
+                        renderRooms(); // إعادة رسم الغرف بالحالة الجديدة
+                    }).catch(err => alert("حدث خطأ: " + err));
+                }
+                barcodeBuffer = '';
+            } else {
+                barcodeBuffer += e.key;
+            }
+        });
+    </script>
+</body>
+
+</html>
