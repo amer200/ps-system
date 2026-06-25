@@ -37,4 +37,28 @@ ipcMain.handle('get-active-sessions', () => {
     return db.prepare(`SELECT room_id, start_time FROM sessions WHERE status = 'active'`).all();
 });
 
+
+// 1. دالة إضافة طلب أو غرامة
+ipcMain.handle('add-charge', (event, { roomId, description, price }) => {
+    // البحث عن الجلسة النشطة لهذه الغرفة
+    const activeSession = db.prepare(`SELECT id FROM sessions WHERE room_id = ? AND status = 'active'`).get(roomId);
+
+    if (!activeSession) {
+        return { success: false, message: 'الغرفة غير مشغولة حالياً، لا يمكن إضافة طلبات.' };
+    }
+
+    // إضافة الطلب وربطه بـ id الجلسة
+    db.prepare(`INSERT INTO session_charges (session_id, description, price) VALUES (?, ?, ?)`).run(activeSession.id, description, price);
+    return { success: true };
+});
+
+// 2. دالة جلب الطلبات الحالية لعرضها في النافذة
+ipcMain.handle('get-room-charges', (event, roomId) => {
+    const activeSession = db.prepare(`SELECT id FROM sessions WHERE room_id = ? AND status = 'active'`).get(roomId);
+
+    if (!activeSession) return []; // لو مفيش جلسة، نرجع مصفوفة فارغة
+
+    // جلب كل الطلبات المرتبطة بهذه الجلسة
+    return db.prepare(`SELECT * FROM session_charges WHERE session_id = ?`).all(activeSession.id);
+});
 app.whenReady().then(createWindow);

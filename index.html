@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net;">
     <title>نظام إدارة البلايستيشن</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -45,10 +45,56 @@
 
 <body class="p-4">
 
+    <script>
+        if (typeof module === 'object') {
+            window.tempModule = module;
+            module = undefined;
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        if (window.tempModule) {
+            module = window.tempModule;
+        }
+    </script>
+
     <div class="container">
         <h2 class="text-center mb-4 text-dark">شاشة المراقبة الرئيسية</h2>
+        <div id="rooms-container" class="row g-4"></div>
+    </div>
+    <div class="modal fade" id="roomModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roomModalLabel">إدارة الغرفة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="roomModalBody">
 
-        <div id="rooms-container" class="row g-4">
+                    <h6 class="text-primary mb-3">إضافة مشروب سريع:</h6>
+                    <div class="d-flex gap-2 mb-4">
+                        <button class="btn btn-sm btn-outline-success" onclick="addCharge('شاي', 10)">شاي (10 ج)</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="addCharge('قهوة', 15)">قهوة (15 ج)</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="addCharge('كانز', 20)">كانز (20 ج)</button>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="text-danger mb-3">إضافة غرامة / طلب آخر:</h6>
+                    <div class="input-group mb-4">
+                        <input type="text" id="customDesc" class="form-control" placeholder="الوصف (مثال: كسر ذراع)">
+                        <input type="number" id="customPrice" class="form-control" placeholder="السعر" style="max-width: 100px;">
+                        <button class="btn btn-danger" onclick="addCustomCharge()">إضافة</button>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="text-dark mb-3">طلبات الجلسة الحالية:</h6>
+                    <ul class="list-group" id="chargesList">
+                    </ul>
+
+                </div>
+            </div>
         </div>
     </div>
 
@@ -71,10 +117,10 @@
             const now = new Date();
             for (let i = 1; i <= 6; i++) {
                 const roomCard = document.getElementById(`room-${i}`);
+                if (!roomCard) continue;
                 const timerDiv = roomCard.querySelector('.timer');
 
                 if (activeRooms[i]) {
-                    // تحويل توقيت قاعدة البيانات لتوقيت يفهمه الجافاسكريبت
                     const startTime = new Date(activeRooms[i].replace(' ', 'T'));
                     const diffInSeconds = Math.floor((now - startTime) / 1000);
                     timerDiv.innerText = formatTime(diffInSeconds);
@@ -96,7 +142,7 @@
 
                 container.innerHTML += `
                 <div class="col-md-4">
-                    <div class="card room-card ${statusClass} text-center p-4" id="room-${i}">
+                    <div class="card room-card ${statusClass} text-center p-4" id="room-${i}" onclick="openRoomDetails(${i})">
                         <h3 class="card-title">غرفة ${i}</h3>
                         <p class="card-text mb-1 fw-bold">${statusText}</p>
                         <div class="timer">00:00:00</div>
@@ -104,6 +150,20 @@
                 </div>
             `;
             }
+        }
+
+        // دالة فتح نافذة الطلبات للغرفة المحددة
+        let currentSelectedRoom = null;
+
+        function openRoomDetails(roomId) {
+            currentSelectedRoom = roomId;
+
+            // تغيير عنوان النافذة برقم الغرفة
+            document.getElementById('roomModalLabel').innerText = `إدارة طلبات - غرفة ${roomId}`;
+
+            // إظهار النافذة (الآن تضمن أن الكائن bootstrap مُعرف بالكامل)
+            const modal = new bootstrap.Modal(document.getElementById('roomModal'));
+            modal.show();
         }
 
         // 4. استرجاع الجلسات النشطة عند فتح البرنامج
@@ -122,11 +182,11 @@
                 if (roomId >= 1 && roomId <= 6) {
                     ipcRenderer.invoke('toggle-room', roomId).then((res) => {
                         if (res.status === 'started') {
-                            activeRooms[roomId] = res.startTime; // إضافة الغرفة للعداد
+                            activeRooms[roomId] = res.startTime;
                         } else {
-                            delete activeRooms[roomId]; // إزالة الغرفة من العداد
+                            delete activeRooms[roomId];
                         }
-                        renderRooms(); // إعادة رسم الغرف بالحالة الجديدة
+                        renderRooms();
                     }).catch(err => alert("حدث خطأ: " + err));
                 }
                 barcodeBuffer = '';
@@ -134,6 +194,80 @@
                 barcodeBuffer += e.key;
             }
         });
+        // دالة لإرسال الطلب للـ Backend
+        function addCharge(description, price) {
+            if (!currentSelectedRoom) return;
+
+            ipcRenderer.invoke('add-charge', {
+                roomId: currentSelectedRoom,
+                description,
+                price
+            }).then((res) => {
+                if (res.success) {
+                    loadRoomCharges(); // تحديث الجدول فوراً بعد الإضافة
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        // دالة مخصصة للغرامات تقرأ من الـ Inputs
+        function addCustomCharge() {
+            const desc = document.getElementById('customDesc').value;
+            const price = parseFloat(document.getElementById('customPrice').value);
+
+            if (desc && price) {
+                addCharge(desc, price);
+                // تصفير الخانات بعد الإضافة
+                document.getElementById('customDesc').value = '';
+                document.getElementById('customPrice').value = '';
+            } else {
+                alert('يرجى إدخال الوصف والسعر بشكل صحيح');
+            }
+        }
+
+        // دالة لجلب الطلبات الحالية وعرضها في الـ Modal
+        function loadRoomCharges() {
+            const list = document.getElementById('chargesList');
+            list.innerHTML = ''; // تفريغ القائمة القديمة
+
+            ipcRenderer.invoke('get-room-charges', currentSelectedRoom).then((charges) => {
+                if (charges.length === 0) {
+                    list.innerHTML = '<li class="list-group-item text-muted text-center">لا توجد طلبات حتى الآن</li>';
+                    return;
+                }
+
+                let total = 0;
+                charges.forEach(charge => {
+                    total += charge.price;
+                    list.innerHTML += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ${charge.description}
+                            <span class="badge bg-primary rounded-pill">${charge.price} ج.م</span>
+                        </li>
+                    `;
+                });
+
+                // إضافة سطر الإجمالي في النهاية
+                list.innerHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center fw-bold bg-light mt-2">
+                        إجمالي الطلبات
+                        <span class="text-danger">${total} ج.م</span>
+                    </li>
+                `;
+            });
+        }
+
+        function openRoomDetails(roomId) {
+            currentSelectedRoom = roomId;
+            document.getElementById('roomModalLabel').innerText = `إدارة طلبات - غرفة ${roomId}`;
+
+            // جلب الطلبات قبل فتح النافذة
+            loadRoomCharges();
+
+            const modal = new bootstrap.Modal(document.getElementById('roomModal'));
+            modal.show();
+        }
     </script>
 </body>
 
