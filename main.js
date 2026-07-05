@@ -4,6 +4,9 @@ const db = require('./database');
 
 app.disableHardwareAcceleration();
 
+// تأكيد وجود رقم سري افتراضي للمدير (1234)
+db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_password', '1234')`).run();
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
@@ -36,8 +39,6 @@ ipcMain.handle('toggle-room', (event, roomId) => {
         const hourlyRate = rateRow ? parseFloat(rateRow.value) : 30;
 
         const timeCost = (billedMinutes / 60) * hourlyRate;
-
-        // جلب تفاصيل الطلبات لعرضها في الفاتورة
         const chargesDetails = db.prepare(`SELECT description, price, type FROM session_charges WHERE session_id = ?`).all(activeSession.id);
         const ordersCost = chargesDetails.reduce((sum, charge) => sum + charge.price, 0);
 
@@ -52,7 +53,7 @@ ipcMain.handle('toggle-room', (event, roomId) => {
                 timeCost: Math.round(timeCost),
                 ordersCost: ordersCost,
                 total: Math.round(finalTotal),
-                chargesDetails: chargesDetails // إرسال التفاصيل للواجهة
+                chargesDetails: chargesDetails
             }
         };
     } else {
@@ -67,7 +68,7 @@ ipcMain.handle('get-active-sessions', () => {
 });
 
 // --------------------------------------------------------
-// 2. إدارة المنتجات
+// 2. إدارة المنتجات والطلبات
 // --------------------------------------------------------
 ipcMain.handle('get-products', () => {
     return db.prepare(`SELECT * FROM products ORDER BY type, name`).all();
@@ -122,7 +123,6 @@ ipcMain.handle('end-shift', () => {
     const shiftPenaltiesOnly = db.prepare(`SELECT SUM(sc.price) as total FROM session_charges sc JOIN sessions s ON sc.session_id = s.id WHERE s.status = 'closed' AND s.end_time >= ? AND sc.type = 'penalty'`).get(activeShift.start_time).total || 0;
     const shiftTime = shiftSales - shiftOrdersOnly - shiftPenaltiesOnly;
 
-    // جلب تفاصيل الغرامات لعرضها في تقرير الشيفت
     const penaltiesList = db.prepare(`
         SELECT sc.description, sc.price, s.room_id 
         FROM session_charges sc
@@ -145,8 +145,19 @@ ipcMain.handle('end-shift', () => {
 });
 
 // --------------------------------------------------------
-// 4. تقارير المدير
+// 4. إعدادات وشاشة المدير وحماية كلمة المرور
 // --------------------------------------------------------
+ipcMain.handle('verify-password', (event, pwd) => {
+    const stored = db.prepare(`SELECT value FROM settings WHERE key = 'admin_password'`).get();
+    const actualPassword = stored ? stored.value : '1234';
+    return pwd === actualPassword;
+});
+
+ipcMain.handle('update-password', (event, newPwd) => {
+    db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password', ?)`).run(newPwd.toString());
+    return { success: true };
+});
+
 ipcMain.handle('get-daily-reports', () => {
     const totalSales = db.prepare(`SELECT SUM(total_price) as total FROM sessions WHERE status = 'closed' AND date(end_time) = date('now', 'localtime')`).get().total || 0;
     const totalCharges = db.prepare(`SELECT SUM(sc.price) as total FROM session_charges sc JOIN sessions s ON sc.session_id = s.id WHERE s.status = 'closed' AND date(s.end_time) = date('now', 'localtime') AND sc.type = 'order'`).get().total || 0;
@@ -177,14 +188,11 @@ ipcMain.handle('get-shifts-history', () => {
     });
 });
 
-// جلب تفاصيل الغرامات للمدير
 ipcMain.handle('get-penalties-log', () => {
     return db.prepare(`
         SELECT sc.description, sc.price, s.room_id, s.end_time
-        FROM session_charges sc
-        JOIN sessions s ON sc.session_id = s.id
-        WHERE sc.type = 'penalty' AND s.status = 'closed'
-        ORDER BY s.end_time DESC LIMIT 100
+        FROM session_charges sc JOIN sessions s ON sc.session_id = s.id
+        WHERE sc.type = 'penalty' AND s.status = 'closed' ORDER BY s.end_time DESC LIMIT 100
     `).all();
 });
 
