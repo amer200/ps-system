@@ -1,18 +1,45 @@
 {
-    "name": "ps-system",
+    "name": "junro-ps-system",
     "version": "1.0.0",
-    "description": "",
+    "description": "نظام إدارة بلايستيشن - صرح لتقنية المعلومات",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "rebuild": "electron-rebuild -f -w better-sqlite3",
+        "build:linux": "electron-builder --linux",
+        "build:win": "electron-builder --win"
     },
-    "keywords": [],
-    "author": "",
+    "keywords": [
+        "playstation",
+        "pos",
+        "management"
+    ],
+    "author": "Amer",
     "license": "ISC",
+    "build": {
+        "appId": "com.sarh.junro",
+        "productName": "Junro PS System",
+        "directories": {
+            "output": "dist"
+        },
+        "linux": {
+            "target": "AppImage",
+            "icon": "logo.png"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "logo.png"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true
+        }
+    },
     "devDependencies": {
         "@electron/rebuild": "^4.0.4",
-        "electron": "^42.5.0"
+        "electron": "^42.5.0",
+        "electron-builder": "^25.0.0"
     },
     "dependencies": {
         "better-sqlite3": "^12.11.1"
