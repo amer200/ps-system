@@ -3,8 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
-    <title>نظام إدارة البلايستيشن</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net;">
+    <title>نظام إدارة البلايستيشن - JUNRO</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -16,6 +16,7 @@
             transition: 0.3s;
             cursor: pointer;
             border: 2px solid transparent;
+            position: relative;
         }
         
         .room-card:hover {
@@ -53,8 +54,25 @@
             background: none;
         }
         
-        .shift-row {
-            font-size: 0.85rem;
+        @keyframes blink {
+            0% {
+                opacity: 1;
+                background-color: #ffcccc;
+            }
+            50% {
+                opacity: 0.5;
+                background-color: #ff0000;
+                color: white;
+            }
+            100% {
+                opacity: 1;
+                background-color: #ffcccc;
+            }
+        }
+        
+        .blink-alarm {
+            animation: blink 0.8s infinite;
+            border: 3px solid red !important;
         }
         
         @media print {
@@ -75,8 +93,8 @@
                 padding: 0;
             }
             .modal-backdrop,
-            .modal-footer,
-            .btn-close {
+            .btn-close,
+            .modal-footer {
                 display: none !important;
             }
             .pos-receipt {
@@ -85,12 +103,6 @@
                 color: #000;
                 font-size: 14px;
                 padding: 10px;
-            }
-            .pos-receipt h3 {
-                font-size: 20px;
-                font-weight: bold;
-                margin-bottom: 5px;
-                text-align: center;
             }
             .pos-divider {
                 border-top: 1.5px dashed #000 !important;
@@ -101,14 +113,10 @@
                 margin: 0;
             }
         }
-        
-        .border-dashed {
-            border-style: dashed !important;
-        }
     </style>
 </head>
 
-<body class="p-4">
+<body class="p-3">
     <script>
         if (typeof module === 'object') {
             window.tempModule = module;
@@ -125,9 +133,9 @@
     <!-- شاشة بدء الشيفت -->
     <div id="shiftOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center;">
         <div class="card p-5 text-center shadow-lg" style="width: 400px; border-radius: 15px;">
-            <h3 class="mb-4 text-primary">تسجيل بدء الوردية</h3>
+            <h3 class="mb-4 text-primary">بدء الوردية</h3>
             <input type="text" id="cashierNameInput" class="form-control mb-3 text-center fs-5" placeholder="اسم الكاشير...">
-            <button class="btn btn-primary btn-lg w-100" onclick="startNewShift()">بدء الشيفت</button>
+            <button class="btn btn-primary btn-lg w-100" onclick="startNewShift()">دخول</button>
         </div>
     </div>
 
@@ -135,156 +143,122 @@
     <div class="modal fade" id="passwordModal" tabindex="-1">
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">تأكيد هوية المدير</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body text-center">
-                    <input type="password" id="adminPasswordInput" class="form-control text-center mb-3 fs-5" placeholder="أدخل الرقم السري">
-                    <button class="btn btn-danger w-100" onclick="verifyAdminPassword()">دخول</button>
-                </div>
+                    <h5 class="text-danger mb-3">تأكيد المدير</h5><input type="password" id="adminPasswordInput" class="form-control text-center mb-3" placeholder="الرقم السري"><button class="btn btn-danger w-100" onclick="verifyAdminPassword()">دخول</button></div>
             </div>
         </div>
     </div>
 
-    <!-- شريط التنقل -->
-    <ul class="nav nav-tabs mb-4 bg-white p-2 shadow-sm rounded" id="mainTabs" role="tablist">
-        <li class="nav-item"><button class="nav-link active fw-bold px-4" id="rooms-tab" type="button">شاشة المراقبة</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold text-danger px-4" id="admin-tab" type="button" onclick="promptAdminPassword()">لوحة تحكم المدير 🛠️</button></li>
-    </ul>
+    <div class="d-flex justify-content-between align-items-center mb-3 bg-white p-2 shadow-sm rounded">
+        <ul class="nav nav-tabs border-0" id="mainTabs" role="tablist">
+            <li class="nav-item"><button class="nav-link active fw-bold px-4" id="rooms-tab" type="button">الشاشة الرئيسية</button></li>
+            <li class="nav-item"><button class="nav-link fw-bold text-danger px-4" id="admin-tab" type="button" onclick="promptAdminPassword()">لوحة المدير 🛠️</button></li>
+        </ul>
+        <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-success fw-bold" onclick="openCafeteriaModal()">☕ الكافيتريا</button>
+            <span id="currentCashierDisplay" class="fw-bold text-primary ms-3"></span>
+            <button id="endShiftBtn" class="btn btn-outline-danger" onclick="endCurrentShift()" style="display: none;">تقفيل الوردية</button>
+        </div>
+    </div>
 
     <div class="tab-content">
         <!-- صفحة الغرف -->
         <div class="tab-pane fade show active" id="rooms-page">
             <div class="container">
-                <h2 class="text-center mb-4 text-dark">شاشة المراقبة الرئيسية - <span id="currentCashierDisplay" class="text-primary fs-4"></span>
-                    <button id="endShiftBtn" class="btn btn-sm btn-outline-danger ms-3" onclick="endCurrentShift()" style="display: none;">إنهاء الوردية وتقفيل الدرج</button>
-                </h2>
-                <div id="rooms-container" class="row g-4"></div>
+                <div id="rooms-container" class="row g-3"></div>
             </div>
         </div>
 
         <!-- لوحة المدير -->
         <div class="tab-pane fade" id="admin-page">
             <div class="container-fluid">
-                <!-- كروت الإحصائيات -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
                         <div class="card bg-primary text-white text-center p-3 shadow-sm">
-                            <h6>الدرج</h6>
+                            <h6>إجمالي الإيرادات</h6>
                             <h3 id="repTotalSales">0 ج.م</h3>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-success text-white text-center p-3 shadow-sm">
-                            <h6>حساب الوقت</h6>
-                            <h3 id="repTotalTime">0 ج.م</h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-info text-white text-center p-3 shadow-sm">
-                            <h6>المشاريب</h6>
-                            <h3 id="repTotalCharges">0 ج.م</h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6">
                         <div class="card bg-danger text-white text-center p-3 shadow-sm">
-                            <h6>الغرامات</h6>
-                            <h3 id="repTotalPenalties">0 ج.م</h3>
+                            <h6>إجمالي المرتجعات المخصومة</h6>
+                            <h3 id="repTotalRefunds">0 ج.م</h3>
                         </div>
                     </div>
                 </div>
-
                 <div class="row g-4">
-                    <!-- الغرف والمنيو -->
-                    <div class="col-md-5">
+                    <div class="col-md-4">
                         <div class="card p-3 shadow-sm mb-3">
-                            <h5 class="border-bottom pb-2">إدارة الغرف والتسعير</h5>
-                            <div class="input-group mb-3">
-                                <input type="text" id="newRoomName" class="form-control" placeholder="اسم الغرفة">
-                                <input type="number" id="newRoomRate" class="form-control" placeholder="سعر الساعة" style="max-width: 100px;">
-                                <button class="btn btn-success" onclick="addNewRoom()">إضافة</button>
+                            <h5 class="border-bottom pb-2">الغرف والمحاكيات</h5>
+                            <div class="row g-1 mb-2">
+                                <div class="col-12"><select id="newRoomType" class="form-select form-select-sm" onchange="toggleRoomTypeInputs()"><option value="PS">بلايستيشن (غرفة)</option><option value="SIM">محاكي سيارات (Simulator)</option></select></div>
+                                <div class="col-12"><input type="text" id="newRoomName" class="form-control form-control-sm" placeholder="اسم الجهاز/الغرفة"></div>
+                                <div id="psInputs" class="row g-1 m-0 p-0 w-100">
+                                    <div class="col-6"><input type="number" id="newRoomPS4S" class="form-control form-control-sm" placeholder="PS4 فردي"></div>
+                                    <div class="col-6"><input type="number" id="newRoomPS4M" class="form-control form-control-sm" placeholder="PS4 Multi"></div>
+                                    <div class="col-6"><input type="number" id="newRoomPS5S" class="form-control form-control-sm" placeholder="PS5 فردي"></div>
+                                    <div class="col-6"><input type="number" id="newRoomPS5M" class="form-control form-control-sm" placeholder="PS5 Multi"></div>
+                                </div>
+                                <div id="simInputs" class="row g-1 m-0 p-0 w-100" style="display:none;">
+                                    <div class="col-12"><input type="number" id="newRoomSimPrice" class="form-control form-control-sm" placeholder="سعر الساعة (محاكي)"></div>
+                                </div>
+                                <div class="col-12 mt-2"><button class="btn btn-success btn-sm w-100" onclick="addNewRoom()">إضافة</button></div>
                             </div>
-                            <div style="max-height: 150px; overflow-y: auto;">
-                                <table class="table table-sm text-center align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>الغرفة</th>
-                                            <th>السعر</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
+                            <div style="max-height: 100px; overflow-y: auto;">
+                                <table class="table table-sm text-center" style="font-size: 0.8rem;">
                                     <tbody id="adminRoomsTable"></tbody>
                                 </table>
                             </div>
                         </div>
-
-                        <div class="card p-3 shadow-sm">
-                            <h5 class="border-bottom pb-2">إدارة المخزن والمنيو</h5>
-                            <div class="row g-2 mb-3">
-                                <div class="col-12 d-flex gap-2">
-                                    <input type="text" id="newProdName" class="form-control" placeholder="الصنف">
-                                    <input type="number" id="newProdPrice" class="form-control" placeholder="السعر" style="width: 80px;">
-                                    <select id="newProdType" class="form-select" style="width: 90px;"><option value="order">مشروب</option><option value="penalty">غرامة</option></select>
-                                </div>
-                                <div class="col-12 d-flex gap-2 align-items-center">
-                                    <div class="form-check form-switch mt-1">
-                                        <input class="form-check-input" type="checkbox" id="newProdIsCountable" onchange="toggleStockInput()">
-                                        <label class="form-check-label text-primary fw-bold" for="newProdIsCountable">منتج معدود</label>
-                                    </div>
-                                    <input type="number" id="newProdStock" class="form-control" placeholder="الكمية المتاحة (المخزن)" style="display: none;">
-                                    <button class="btn btn-primary ms-auto" onclick="addNewProduct()">إضافة للمخزن</button>
-                                </div>
-                            </div>
-                            <div style="max-height: 200px; overflow-y: auto;">
+                        <div class="card p-3 shadow-sm mb-3">
+                            <h5 class="border-bottom pb-2">طلبات المرتجعات</h5>
+                            <div style="max-height: 150px; overflow-y: auto;">
                                 <table class="table table-sm text-center align-middle" style="font-size: 0.85rem;">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>الاسم</th>
+                                            <th>الطلب</th>
                                             <th>السعر</th>
-                                            <th>النوع</th>
-                                            <th>المخزن</th>
-                                            <th></th>
+                                            <th>قرار</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="adminProductsTable"></tbody>
+                                    <tbody id="adminRefundsTable"></tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
-
-                    <!-- سجل الورديات -->
-                    <div class="col-md-7">
+                    <div class="col-md-4">
                         <div class="card p-3 shadow-sm mb-3">
-                            <h5 class="border-bottom pb-2 text-primary">سجل الورديات المقفولة</h5>
-                            <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
-                                <table class="table table-hover text-center shift-row align-middle">
-                                    <thead class="table-dark sticky-top">
-                                        <tr>
-                                            <th>الكاشير</th>
-                                            <th>البدء</th>
-                                            <th>الانتهاء</th>
-                                            <th>الوقت</th>
-                                            <th>مشاريب</th>
-                                            <th>غرامات</th>
-                                            <th>الدرج</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="shiftsHistoryTable"></tbody>
+                            <h5 class="border-bottom pb-2">المنيو والمخزن</h5>
+                            <div class="row g-1 mb-2">
+                                <div class="col-6"><input type="text" id="newProdName" class="form-control form-control-sm" placeholder="الصنف"></div>
+                                <div class="col-6"><input type="number" id="newProdPrice" class="form-control form-control-sm" placeholder="السعر"></div>
+                                <div class="col-6"><select id="newProdType" class="form-select form-select-sm"><option value="order">مشروب</option><option value="penalty">غرامة</option></select></div>
+                                <div class="col-6"><input type="number" id="newProdStock" class="form-control form-control-sm" placeholder="الكمية (للمعدود)"></div>
+                                <div class="col-12 text-start"><input type="checkbox" id="newProdIsCountable"> <label class="fw-bold" style="font-size: 0.85rem;">معدود</label> <button class="btn btn-primary btn-sm float-end" onclick="addNewProduct()">إضافة</button></div>
+                            </div>
+                            <div style="max-height: 150px; overflow-y: auto;">
+                                <table class="table table-sm text-center" style="font-size: 0.8rem;">
+                                    <tbody id="adminProductsTable"></tbody>
                                 </table>
                             </div>
                         </div>
                         <div class="card p-3 shadow-sm">
-                            <h5 class="border-bottom pb-2 text-danger">سجل تفاصيل الغرامات</h5>
-                            <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">
-                                <table class="table table-hover table-sm text-center align-middle">
-                                    <thead class="table-light sticky-top">
+                            <h5 class="border-bottom pb-2">الرقم السري</h5>
+                            <div class="input-group input-group-sm"><input type="password" id="newAdminPassword" class="form-control" placeholder="رقم جديد"><button class="btn btn-danger" onclick="changeAdminPassword()">حفظ</button></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card p-3 shadow-sm mb-3">
+                            <h5 class="border-bottom pb-2 text-primary">سجل الورديات</h5>
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-hover text-center align-middle" style="font-size: 0.8rem;">
+                                    <thead class="table-dark sticky-top">
                                         <tr>
-                                            <th>الغرفة</th>
-                                            <th>السبب</th>
-                                            <th>المبلغ</th>
-                                            <th>التاريخ</th>
+                                            <th>الشيفت</th>
+                                            <th>التفاصيل</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="penaltiesLogTable"></tbody>
+                                    <tbody id="shiftsHistoryTable"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -294,23 +268,92 @@
         </div>
     </div>
 
-    <!-- نافذة إدارة الغرفة -->
+    <!-- نافذة الكافيتريا -->
+    <div class="modal fade" id="cafeteriaModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">بيع مباشر (كافيتريا)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8 border-end">
+                            <!-- خانة إدخال صنف حر للكافيتريا -->
+                            <div class="input-group mb-3 border-bottom pb-3">
+                                <input type="text" id="cafeCustomDesc" class="form-control" placeholder="صنف حر/غرامة خارجية">
+                                <input type="number" id="cafeCustomPrice" class="form-control" placeholder="السعر" style="max-width: 100px;">
+                                <button class="btn btn-outline-success fw-bold" onclick="addCafeCustom('order')">إضافة طلب</button>
+                            </div>
+                            <div id="cafeProductsButtons" class="d-flex flex-wrap gap-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-center fw-bold">سلة الطلبات</h6>
+                            <ul class="list-group mb-3" id="cafeCartList" style="font-size: 0.9rem; max-height: 250px; overflow-y:auto;"></ul>
+                            <button class="btn btn-success w-100 fs-5 fw-bold" onclick="confirmCafeteriaSales()">دفع وإصدار بون</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تشغيل الغرفة / المحاكي -->
+    <div class="modal fade" id="startRoomModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-center p-3">
+                <h5 class="mb-3 border-bottom pb-2">تشغيل <span id="startRoomName" class="text-primary fw-bold"></span></h5>
+                <div id="psStartOptions" class="row g-2">
+                    <div class="col-6"><button class="btn btn-outline-primary w-100 py-3" onclick="executeStartRoom('PS4', 'single', 0)"><strong>PS4</strong><br>👤 فردي</button></div>
+                    <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="executeStartRoom('PS4', 'multi', 0)"><strong>PS4</strong><br>👥 Multi</button></div>
+                    <div class="col-6"><button class="btn btn-outline-danger w-100 py-3" onclick="executeStartRoom('PS5', 'single', 0)"><strong>PS5</strong><br>👤 فردي</button></div>
+                    <div class="col-6"><button class="btn btn-danger w-100 py-3" onclick="executeStartRoom('PS5', 'multi', 0)"><strong>PS5</strong><br>👥 Multi</button></div>
+                </div>
+                <div id="simStartOptions" style="display:none;">
+                    <p class="text-muted mb-2">اختر نظام الدفع:</p>
+                    <button class="btn btn-success w-100 py-2 mb-2 fw-bold" onclick="executeStartRoom('SIM', 'single', 0)">♾️ وقت مفتوح (مفتوح)</button>
+                    <div class="input-group">
+                        <select id="simTargetMinutesInput" class="form-select"><option value="30">نصف ساعة (30 د)</option><option value="60">ساعة (60 د)</option><option value="90">ساعة ونصف (90 د)</option><option value="120">ساعتين (120 د)</option></select>
+                        <button class="btn btn-warning fw-bold" onclick="startSimLimited()">⏱️ تشغيل بوقت</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إدارة الغرفة (وهي شغالة) -->
     <div class="modal fade" id="roomModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="roomModalLabel">إدارة الغرفة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header d-flex justify-content-between align-items-center">
+                    <h5 class="modal-title fw-bold" id="roomModalLabel"></h5>
+                    <div id="roomModeSwitchArea"></div>
+                </div>
                 <div class="modal-body">
-                    <div id="dynamicProductsButtons" class="d-flex flex-wrap gap-2 mb-3 border-bottom pb-3"></div>
-                    <h6 class="text-danger mb-3">إضافة طلب حر أو غرامة:</h6>
-                    <div class="input-group mb-4 border-bottom pb-4">
-                        <input type="text" id="customDesc" class="form-control" placeholder="الوصف (مثال: كسر ذراع)">
+                    <!-- خانة الصنف الحر داخل الغرفة -->
+                    <div class="input-group mb-3 border-bottom pb-3">
+                        <input type="text" id="customDesc" class="form-control" placeholder="صنف حر/تالف/غرامة">
                         <input type="number" id="customPrice" class="form-control" placeholder="السعر" style="max-width: 100px;">
-                        <button class="btn btn-success" onclick="addCustomCharge('order')">طلب</button>
-                        <button class="btn btn-danger" onclick="addCustomCharge('penalty')">غرامة</button>
+                        <button class="btn btn-outline-success fw-bold" onclick="addCustomCharge('order')">طلب</button>
+                        <button class="btn btn-outline-danger fw-bold" onclick="addCustomCharge('penalty')">غرامة</button>
                     </div>
-                    <h6 class="text-dark mb-2">طلبات الجلسة الحالية:</h6>
-                    <ul class="list-group mb-2" id="chargesList"></ul>
+
+                    <div id="dynamicProductsButtons" class="d-flex flex-wrap gap-2 mb-3 border-bottom pb-3"></div>
+
+                    <h6 class="text-dark mb-2 fw-bold">الطلبات المسجلة:</h6>
+                    <ul class="list-group mb-3" id="chargesList" style="max-height: 200px; overflow-y: auto; font-size:0.9rem;"></ul>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success w-50 fw-bold" onclick="stopActiveRoom()">إيقاف ومحاسبة 🖨️</button>
+                        <div class="btn-group w-50">
+                            <button type="button" class="btn btn-outline-danger dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false">إلغاء الغرفة ⚠️</button>
+                            <ul class="dropdown-menu border-danger">
+                                <li><a class="dropdown-item fw-bold" href="#" onclick="voidRoom('time')">تصفير وقت الجلسة فقط ⏳</a></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="voidRoom('all')">إلغاء الغرفة بالكامل (وقت وطلبات) 🗑️</a></li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -322,29 +365,25 @@
             <div class="modal-content p-0">
                 <div class="modal-body p-0">
                     <div class="pos-receipt text-center p-3 bg-white text-dark mx-auto" style="max-width: 320px;">
-                        <div class="text-center mb-2"><img src="logo.png" alt="Logo" style="max-width: 80px; display: block; margin: 0 auto; border-radius: 8px;" onerror="this.style.display='none'"></div>
                         <h3 class="fw-bold mb-0" style="letter-spacing: 2px;">JUNRO</h3>
-                        <p class="mb-1 text-muted" style="font-size: 0.9rem;">PlayStation & Lounge</p>
                         <div class="pos-divider border-top border-dark border-2 border-dashed my-2"></div>
-                        <h5 class="fw-bold my-2"><span id="invRoomNumber"></span></h5>
+                        <h5 class="fw-bold my-2"><span id="invRoomNumber">كافيتريا</span></h5>
                         <div class="pos-divider border-top border-dark border-2 border-dashed my-2"></div>
-
-                        <!-- تم إزالة المدة الفعلية والإبقاء على المدة المحسوبة فقط -->
-                        <div class="d-flex justify-content-between mb-1"><span>مدة اللعب:</span> <strong id="invBilledMinutes">0 دقيقة</strong></div>
-                        <div class="d-flex justify-content-between mb-1 fw-bold mt-2"><span>حساب الوقت:</span> <strong id="invTimeCost">0 ج.م</strong></div>
-
-                        <div class="pos-divider border-top border-dark border-2 border-dashed my-2"></div>
-                        <div class="text-start fw-bold mb-1">الطلبات والغرامات:</div>
+                        <div id="invTimeSection">
+                            <div class="text-start mb-1 fw-bold">تفصيل الوقت:</div>
+                            <ul class="list-unstyled text-start mb-2" id="invIntervalsList" style="font-size: 0.85rem;"></ul>
+                            <div class="d-flex justify-content-between mb-1 fw-bold border-bottom pb-1"><span>إجمالي حساب الوقت:</span> <strong id="invTimeCost">0 ج.م</strong></div>
+                        </div>
+                        <div class="text-start fw-bold mb-1 mt-2">المشاريب والطلبات:</div>
                         <ul class="list-unstyled text-start mb-2" id="invChargesList"></ul>
                         <div class="pos-divider border-top border-dark border-2 border-dashed my-2"></div>
-                        <div class="d-flex justify-content-between fs-5 fw-bold mt-2"><span>الإجمالي:</span> <span><span id="invTotal">0</span> ج.م</span>
+                        <div class="d-flex justify-content-between fs-5 fw-bold mt-2"><span>الإجمالي المطلوب:</span> <span><span id="invTotal">0</span> ج</span>
                         </div>
                         <div class="pos-divider border-top border-dark border-2 border-dashed my-2"></div>
-                        <p class="mt-2 mb-2 text-center fw-bold" style="font-size: 0.9rem;">شكراً لزيارتكم!</p>
-                        <div class="mt-3 pt-2 text-center" style="font-size: 0.75rem; color: #444; border-top: 1px solid #ccc;">System Developed by <strong>Amer</strong><br>📞 01152306375</div>
+                        <div class="mt-2 text-center" style="font-size: 0.7rem;">System by Amer - 01152306375</div>
                     </div>
                 </div>
-                <div class="modal-footer justify-content-center"><button class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button><button class="btn btn-primary" onclick="window.print()">طباعة الفاتورة 🖨️</button></div>
+                <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button><button class="btn btn-primary" onclick="window.print()">طباعة 🖨️</button></div>
             </div>
         </div>
     </div>
@@ -354,18 +393,18 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">تقرير الوردية</h5>
+                    <h5 class="modal-title">تقرير التقفيل</h5>
                 </div>
                 <div class="modal-body text-center">
                     <h4 class="mb-3 border-bottom pb-2">كاشير: <span id="repCashierName" class="text-primary"></span></h4>
-                    <ul class="list-group list-group-flush text-start mb-3 fs-5">
-                        <li class="list-group-item d-flex justify-content-between"><span>الوقت:</span> <strong id="repShiftTime">0 ج.م</strong></li>
-                        <li class="list-group-item d-flex justify-content-between"><span>المشاريب:</span> <strong id="repShiftOrders">0 ج.م</strong></li>
-                        <li class="list-group-item d-flex justify-content-between text-danger"><span>الغرامات:</span> <strong id="repShiftPenaltiesTotal">0 ج.م</strong></li>
-                    </ul>
-                    <div class="alert alert-danger fs-3 fw-bold">الدرج: <span id="repShiftTotal">0</span> ج.م</div>
+                    <div class="alert alert-info text-start p-2 mb-3">
+                        <strong class="d-block mb-1">إجمالي ساعات اللعب: <span id="repTotalHours" class="text-dark">0</span> ساعة</strong>
+                        <hr class="my-1"><strong class="d-block mb-1">المبيعات الإجمالية (غرف + كافيتريا):</strong>
+                        <ul class="list-unstyled mb-0 ms-2" id="repSoldItemsList" style="font-size: 0.9rem;"></ul>
+                    </div>
+                    <div class="alert alert-danger fs-3 fw-bold">إجمالي الدرج: <span id="repShiftTotal">0</span> ج.م</div>
                 </div>
-                <div class="modal-footer justify-content-center"><button class="btn btn-success btn-lg" onclick="closeShiftReportAndLock()">استلام الشيفت</button></div>
+                <div class="modal-footer justify-content-center"><button class="btn btn-success btn-lg" onclick="closeShiftReportAndLock()">طباعة الجرد وتقفيل 🖨️</button></div>
             </div>
         </div>
     </div>
@@ -375,9 +414,52 @@
             ipcRenderer
         } = require('electron');
         let activeRooms = {};
-        let currentShift = null;
         let allProducts = [];
         let allRoomsList = [];
+        let roomToStart = null;
+        let currentSelectedRoom = null;
+        let cafeCart = [];
+
+        let audioCtx = null;
+        let alarmIntervals = {};
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playBeep(roomId) {
+            initAudio();
+            if (alarmIntervals[roomId]) return;
+            alarmIntervals[roomId] = setInterval(() => {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }, 1000);
+        }
+
+        function stopBeep(roomId) {
+            if (alarmIntervals[roomId]) {
+                clearInterval(alarmIntervals[roomId]);
+                delete alarmIntervals[roomId];
+            }
+        }
+
+        document.getElementById('rooms-tab').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('admin-tab').classList.remove('active');
+            document.getElementById('admin-page').classList.remove('show', 'active');
+            this.classList.add('active');
+            document.getElementById('rooms-page').classList.add('show', 'active');
+            fetchAdminRefunds();
+        });
 
         function promptAdminPassword() {
             document.getElementById('adminPasswordInput').value = '';
@@ -385,8 +467,7 @@
         }
 
         function verifyAdminPassword() {
-            const pwd = document.getElementById('adminPasswordInput').value;
-            ipcRenderer.invoke('verify-password', pwd).then(isValid => {
+            ipcRenderer.invoke('verify-password', document.getElementById('adminPasswordInput').value).then(isValid => {
                 if (isValid) {
                     bootstrap.Modal.getInstance(document.getElementById('passwordModal')).hide();
                     document.getElementById('rooms-tab').classList.remove('active');
@@ -394,18 +475,154 @@
                     document.getElementById('admin-tab').classList.add('active');
                     document.getElementById('admin-page').classList.add('show', 'active');
                     loadAdminDashboard();
-                } else {
-                    alert('كلمة المرور غير صحيحة!');
-                }
+                } else alert('الرقم السري غير صحيح!');
             });
         }
-        document.getElementById('rooms-tab').addEventListener('click', function(e) {
-            e.preventDefault();
-            document.getElementById('admin-tab').classList.remove('active');
-            document.getElementById('admin-page').classList.remove('show', 'active');
-            this.classList.add('active');
-            document.getElementById('rooms-page').classList.add('show', 'active');
-        });
+
+        function changeAdminPassword() {
+            const pwd = document.getElementById('newAdminPassword').value;
+            if (pwd) ipcRenderer.invoke('update-password', pwd).then(() => {
+                alert('تم التغيير!');
+                document.getElementById('newAdminPassword').value = '';
+            });
+        }
+
+        // --- الكافيتريا ---
+        function openCafeteriaModal() {
+            cafeCart = [];
+            updateCafeCart();
+            new bootstrap.Modal(document.getElementById('cafeteriaModal')).show();
+        }
+
+        function addToCafeCart(id, name, price, type) {
+            const existing = cafeCart.find(i => i.productId === id && id !== null);
+            if (existing) existing.qty++;
+            else cafeCart.push({
+                productId: id,
+                name,
+                price,
+                type,
+                qty: 1
+            });
+            updateCafeCart();
+        }
+
+        function addCafeCustom(type) {
+            const desc = document.getElementById('cafeCustomDesc').value.trim();
+            const price = parseFloat(document.getElementById('cafeCustomPrice').value);
+            if (desc && price > 0) {
+                addToCafeCart(null, desc, price, type);
+                document.getElementById('cafeCustomDesc').value = '';
+                document.getElementById('cafeCustomPrice').value = '';
+            }
+        }
+
+        function updateCafeCart() {
+            const list = document.getElementById('cafeCartList');
+            list.innerHTML = '';
+            let total = 0;
+            if (cafeCart.length === 0) {
+                list.innerHTML = '<li class="list-group-item text-muted">السلة فارغة</li>';
+                return;
+            }
+            cafeCart.forEach((item, index) => {
+                total += (item.price * item.qty);
+                list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center"><span class="fw-bold">${item.qty}x</span> ${item.name} <span>${item.price * item.qty} ج</span><button class="btn btn-sm btn-danger py-0 px-1" onclick="cafeCart.splice(${index},1); updateCafeCart();">x</button></li>`;
+            });
+            list.innerHTML += `<li class="list-group-item text-center fw-bold bg-light">الإجمالي: ${total} ج.م</li>`;
+        }
+
+        function confirmCafeteriaSales() {
+            if (cafeCart.length === 0) return;
+            ipcRenderer.invoke('add-direct-order', {
+                cart: cafeCart
+            }).then(res => {
+                if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('cafeteriaModal')).hide();
+                    fetchProducts();
+                    document.getElementById('invRoomNumber').innerText = "فاتورة كافيتريا";
+                    document.getElementById('invTimeSection').style.display = 'none';
+                    const invList = document.getElementById('invChargesList');
+                    invList.innerHTML = '';
+                    let total = 0;
+                    cafeCart.forEach(c => {
+                        total += (c.price * c.qty);
+                        invList.innerHTML += `<li class="d-flex justify-content-between mb-1"><span><span class="fw-bold">${c.qty}x</span> ${c.name}</span> <span>${c.price * c.qty} ج.م</span></li>`;
+                    });
+                    document.getElementById('invTotal').innerText = total;
+                    new bootstrap.Modal(document.getElementById('invoiceModal')).show();
+                    cafeCart = [];
+                } else alert(res.message);
+            });
+        }
+
+        // --- المرتجعات والإلغاء ---
+        function requestRefund(type, id, desc, amt) {
+            if (confirm('تأكيد الإلغاء لـ: ' + desc + ' ؟ (سيتم الإرسال للمدير)')) {
+                ipcRenderer.invoke('request-refund', {
+                    type,
+                    id,
+                    description: desc,
+                    amount: amt
+                }).then(res => {
+                    if (res.success) {
+                        loadRoomCharges();
+                        fetchRooms();
+                    }
+                });
+            }
+        }
+
+        function voidRoom(type) {
+            if (confirm(type === 'time' ? 'تأكيد تصفير وقت الجلسة فقط؟ (الطلبات ستظل محسوبة في الفاتورة)' : 'تأكيد إلغاء الغرفة بالكامل؟ (سيتم تصفير الوقت وإرجاع جميع الطلبات)')) {
+                ipcRenderer.invoke('void-room', {
+                    roomId: currentSelectedRoom,
+                    voidType: type
+                }).then(res => {
+                    if (res.success) {
+                        alert('تمت العملية وإغلاق الغرفة. تم رفع طلب المرتجع للمدير للموافقة.');
+                        bootstrap.Modal.getInstance(document.getElementById('roomModal')).hide();
+                        stopBeep(currentSelectedRoom);
+                        delete activeRooms[currentSelectedRoom];
+                        renderRooms();
+                    } else alert(res.message);
+                });
+            }
+        }
+
+        function fetchAdminRefunds() {
+            ipcRenderer.invoke('get-pending-refunds').then(reqs => {
+                const tbody = document.getElementById('adminRefundsTable');
+                tbody.innerHTML = '';
+                if (reqs.length === 0) tbody.innerHTML = '<tr><td colspan="3" class="text-muted">لا يوجد طلبات</td></tr>';
+                reqs.forEach(r => {
+                    tbody.innerHTML += `<tr><td class="text-danger fw-bold">${r.description}</td><td>${r.amount ? r.amount+' ج' : '-'}</td><td><button class="btn btn-sm btn-success me-1 py-0 px-2" onclick="processRefund(${r.id}, 'approve')">✔</button><button class="btn btn-sm btn-danger py-0 px-2" onclick="processRefund(${r.id}, 'reject')">✖</button></td></tr>`;
+                });
+            });
+        }
+
+        function processRefund(id, action) {
+            ipcRenderer.invoke('process-refund', {
+                reqId: id,
+                action
+            }).then(() => {
+                fetchAdminRefunds();
+                fetchRooms();
+                loadAdminDashboard();
+            });
+        }
+
+        // --- إدارة الغرف ---
+        function toggleRoomTypeInputs() {
+            const type = document.getElementById('newRoomType').value;
+            if (type === 'PS') {
+                document.getElementById('psInputs').style.display = 'flex';
+                document.getElementById('simInputs').style.display = 'none';
+            } else {
+                document.getElementById('psInputs').style.display = 'none';
+                document.getElementById('simInputs').style.display = 'flex';
+            }
+        }
 
         function fetchRooms() {
             ipcRenderer.invoke('get-rooms').then(rooms => {
@@ -419,57 +636,168 @@
             const table = document.getElementById('adminRoomsTable');
             table.innerHTML = '';
             allRoomsList.forEach(r => {
-                table.innerHTML += `<tr><td class="fw-bold">${r.name}</td><td>${r.hourly_rate} ج.م</td><td><button class="btn btn-sm btn-danger py-0 px-2" onclick="deleteRoom(${r.id})">x</button></td></tr>`;
+                if (r.device_type === 'SIM') table.innerHTML += `<tr><td class="fw-bold">${r.name}<br><span class="badge bg-dark">محاكي</span></td><td colspan="2">سعر الساعة: ${r.sim_price}</td><td><button class="btn btn-sm btn-danger py-0 px-2" onclick="deleteRoom(${r.id})">x</button></td></tr>`;
+                else table.innerHTML += `<tr><td class="fw-bold">${r.name}</td><td>${r.ps4_single}/${r.ps4_multi}</td><td>${r.ps5_single}/${r.ps5_multi}</td><td><button class="btn btn-sm btn-danger py-0 px-2" onclick="deleteRoom(${r.id})">x</button></td></tr>`;
             });
         }
 
         function addNewRoom() {
-            const name = document.getElementById('newRoomName').value.trim();
-            const rate = parseFloat(document.getElementById('newRoomRate').value);
-            if (name && rate > 0) {
-                ipcRenderer.invoke('add-room', {
-                    name,
-                    rate
-                }).then(() => {
-                    document.getElementById('newRoomName').value = '';
-                    document.getElementById('newRoomRate').value = '';
-                    fetchRooms();
-                });
-            } else {
-                alert('أدخل اسم وسعر صحيح للغرفة');
-            }
+            const name = document.getElementById('newRoomName').value;
+            const type = document.getElementById('newRoomType').value;
+            const ps4_s = parseFloat(document.getElementById('newRoomPS4S').value);
+            const ps4_m = parseFloat(document.getElementById('newRoomPS4M').value);
+            const ps5_s = parseFloat(document.getElementById('newRoomPS5S').value);
+            const ps5_m = parseFloat(document.getElementById('newRoomPS5M').value);
+            const simPrice = parseFloat(document.getElementById('newRoomSimPrice').value);
+            ipcRenderer.invoke('add-room', {
+                name,
+                deviceType: type,
+                ps4_s,
+                ps4_m,
+                ps5_s,
+                ps5_m,
+                simPrice
+            }).then(() => {
+                document.getElementById('newRoomName').value = '';
+                fetchRooms();
+            });
         }
 
         function deleteRoom(id) {
-            if (confirm("حذف الغرفة؟")) {
-                ipcRenderer.invoke('delete-room', id).then(() => fetchRooms());
-            }
+            if (confirm("حذف؟")) ipcRenderer.invoke('delete-room', id).then(() => fetchRooms());
         }
 
         function renderRooms() {
             const container = document.getElementById('rooms-container');
             container.innerHTML = '';
             allRoomsList.forEach(room => {
-                const isBusy = activeRooms[room.id] !== undefined;
+                const session = activeRooms[room.id];
+                const isBusy = session !== undefined;
+                const modeText = isBusy ? (room.device_type === 'SIM' ? (session.targetMinutes > 0 ? 'محدد بوقت' : 'مفتوح') : (session.playMode === 'multi' ? 'Multi' : 'فردي')) : '';
+                const icon = room.device_type === 'SIM' ? '🏎️' : '🎮';
+                let cardClass = isBusy ? 'status-busy' : 'status-available';
+                let statusText = isBusy ? `مشغول (${modeText})` : 'متاح';
+
                 container.innerHTML += `
-                <div class="col-md-4">
-                    <div class="card room-card ${isBusy ? 'status-busy' : 'status-available'} text-center p-4" id="room-${room.id}" onclick="openRoomDetails(${room.id}, '${room.name}')">
-                        <h3 class="card-title">${room.name}</h3><p class="card-text mb-1 fw-bold">${isBusy ? 'مشغول' : 'متاح'}</p>
-                        <small class="text-muted">الساعة: ${room.hourly_rate} ج.م</small><div class="timer">00:00:00</div>
+                <div class="col-md-3">
+                    <div class="card room-card ${cardClass} text-center p-3" id="room-${room.id}" onclick="handleRoomClick(${room.id})">
+                        <h4 class="card-title mb-1">${icon} ${room.name}</h4><p class="card-text mb-1 fw-bold" style="font-size:0.85rem;">${statusText}</p>
+                        <div class="timer mt-1" style="font-size:1.2rem;">00:00:00</div>
                     </div>
                 </div>`;
             });
         }
 
-        function toggleStockInput() {
-            document.getElementById('newProdStock').style.display = document.getElementById('newProdIsCountable').checked ? 'block' : 'none';
+        function handleRoomClick(roomId) {
+            initAudio();
+            const roomObj = allRoomsList.find(r => r.id === roomId);
+            const session = activeRooms[roomId];
+            if (session) {
+                currentSelectedRoom = roomId;
+                document.getElementById('roomModalLabel').innerText = roomObj.name;
+                if (roomObj.device_type === 'PS') {
+                    const switchBtn = session.playMode === 'single' ? `<button class="btn btn-sm btn-warning fw-bold" onclick="switchMode(${roomId}, 'multi')">🔄 تحويل لـ Multi</button>` : `<button class="btn btn-sm btn-info fw-bold" onclick="switchMode(${roomId}, 'single')">🔄 تحويل لـ فردي</button>`;
+                    document.getElementById('roomModeSwitchArea').innerHTML = switchBtn;
+                } else {
+                    document.getElementById('roomModeSwitchArea').innerHTML = `<span class="badge bg-dark fs-6">محاكي سيارات</span>`;
+                }
+                loadRoomCharges();
+                new bootstrap.Modal(document.getElementById('roomModal')).show();
+            } else {
+                roomToStart = roomId;
+                document.getElementById('startRoomName').innerText = roomObj.name;
+                if (roomObj.device_type === 'SIM') {
+                    document.getElementById('psStartOptions').style.display = 'none';
+                    document.getElementById('simStartOptions').style.display = 'block';
+                } else {
+                    document.getElementById('psStartOptions').style.display = 'flex';
+                    document.getElementById('simStartOptions').style.display = 'none';
+                }
+                new bootstrap.Modal(document.getElementById('startRoomModal')).show();
+            }
         }
 
+        function switchMode(roomId, newMode) {
+            if (confirm('تأكيد التحويل وحفظ الوقت السابق؟')) {
+                ipcRenderer.invoke('switch-mode', {
+                    roomId,
+                    newMode
+                }).then(res => {
+                    if (res.success) {
+                        activeRooms[roomId].playMode = newMode;
+                        bootstrap.Modal.getInstance(document.getElementById('roomModal')).hide();
+                        renderRooms();
+                    }
+                });
+            }
+        }
+
+        function startSimLimited() {
+            const mins = parseInt(document.getElementById('simTargetMinutesInput').value);
+            executeStartRoom('SIM', 'single', mins);
+        }
+
+        function executeStartRoom(consoleType, playMode, targetMinutes) {
+            bootstrap.Modal.getInstance(document.getElementById('startRoomModal')).hide();
+            ipcRenderer.invoke('toggle-room', {
+                roomId: roomToStart,
+                playMode,
+                consoleType,
+                targetMinutes
+            }).then((res) => {
+                if (res.status === 'started') {
+                    activeRooms[roomToStart] = {
+                        startTime: res.startTime,
+                        playMode,
+                        consoleType,
+                        targetMinutes,
+                        status: 'active'
+                    };
+                    renderRooms();
+                }
+            });
+        }
+
+        function stopActiveRoom() {
+            if (!currentSelectedRoom) return;
+            if (confirm("تأكيد إيقاف اللعب وإصدار الفاتورة؟")) {
+                bootstrap.Modal.getInstance(document.getElementById('roomModal')).hide();
+                stopBeep(currentSelectedRoom);
+                ipcRenderer.invoke('toggle-room', {
+                    roomId: currentSelectedRoom
+                }).then((res) => {
+                    delete activeRooms[currentSelectedRoom];
+                    document.getElementById('invTimeSection').style.display = 'block';
+                    document.getElementById('invRoomNumber').innerText = res.bill.roomName;
+                    const invInt = document.getElementById('invIntervalsList');
+                    invInt.innerHTML = '';
+                    res.bill.intervalsDetails.forEach(inv => {
+                        invInt.innerHTML += `<li>- ${inv.mode} (${inv.actualMins} دقيقة) <span class="float-end">${inv.cost} ج</span></li>`;
+                    });
+                    document.getElementById('invTimeCost').innerText = `${res.bill.timeCost} ج.م`;
+                    document.getElementById('invTotal').innerText = res.bill.total;
+                    const invList = document.getElementById('invChargesList');
+                    invList.innerHTML = '';
+                    if (res.bill.chargesDetails && res.bill.chargesDetails.length > 0) {
+                        res.bill.chargesDetails.forEach(c => {
+                            invList.innerHTML += `<li class="d-flex justify-content-between mb-1"><span><span class="fw-bold">${c.qty}x</span> ${c.description}</span> <span>${c.price} ج.م</span></li>`;
+                        });
+                    } else {
+                        invList.innerHTML = '<li class="text-center text-muted">بدون طلبات</li>';
+                    }
+                    new bootstrap.Modal(document.getElementById('invoiceModal')).show();
+                    renderRooms();
+                });
+            }
+        }
+
+        // --- المنيو والطلبات ---
         function fetchProducts() {
             ipcRenderer.invoke('get-products').then(products => {
                 allProducts = products;
                 renderRoomProducts();
                 renderAdminProducts();
+                renderCafeProducts();
             });
         }
 
@@ -477,13 +805,13 @@
             const table = document.getElementById('adminProductsTable');
             table.innerHTML = '';
             allProducts.forEach(prod => {
-                const stockText = prod.is_countable ? `<span class="badge bg-primary">${prod.stock}</span>` : `<span class="text-muted">غير معدود</span>`;
-                table.innerHTML += `<tr><td>${prod.name}</td><td>${prod.price}</td><td><span class="badge ${prod.type === 'order' ? 'bg-success' : 'bg-danger'}">${prod.type === 'order' ? 'مشروب' : 'غرامة'}</span></td><td>${stockText}</td><td><button class="btn btn-sm btn-danger py-0 px-2" onclick="deleteProduct(${prod.id})">x</button></td></tr>`;
+                const stockText = prod.is_countable ? `<span class="badge bg-primary">${prod.stock}</span>` : `<span class="text-muted">-</span>`;
+                table.innerHTML += `<tr><td>${prod.name}</td><td>${prod.price}</td><td><span class="badge ${prod.type === 'order' ? 'bg-success' : 'bg-danger'}">${prod.type==='order'?'مشروب':'غرامة'}</span></td><td>${stockText}</td><td><button class="btn btn-sm btn-danger py-0 px-2" onclick="deleteProduct(${prod.id})">x</button></td></tr>`;
             });
         }
 
         function addNewProduct() {
-            const name = document.getElementById('newProdName').value.trim();
+            const name = document.getElementById('newProdName').value;
             const price = parseFloat(document.getElementById('newProdPrice').value);
             const type = document.getElementById('newProdType').value;
             const isCountable = document.getElementById('newProdIsCountable').checked;
@@ -496,23 +824,13 @@
                     isCountable,
                     stock
                 }).then(res => {
-                    if (res.success) {
-                        document.getElementById('newProdName').value = '';
-                        document.getElementById('newProdPrice').value = '';
-                        fetchProducts();
-                    } else {
-                        alert(res.message);
-                    }
+                    if (res.success) fetchProducts();
                 });
-            } else {
-                alert("يرجى إدخال البيانات!");
             }
         }
 
         function deleteProduct(id) {
-            if (confirm("حذف الصنف؟")) {
-                ipcRenderer.invoke('delete-product', id).then(() => fetchProducts());
-            }
+            if (confirm("حذف الصنف؟")) ipcRenderer.invoke('delete-product', id).then(() => fetchProducts());
         }
 
         function renderRoomProducts() {
@@ -521,18 +839,17 @@
             container.innerHTML = '';
             allProducts.forEach(prod => {
                 const btnClass = prod.type === 'order' ? 'btn-outline-success' : 'btn-outline-danger';
-                const stockLabel = prod.is_countable ? `(متاح: ${prod.stock})` : '';
-                container.innerHTML += `<button class="btn btn-sm ${btnClass}" onclick="addCharge('${prod.name}', ${prod.price}, '${prod.type}', ${prod.id})">${prod.name} ${stockLabel} - ${prod.price} ج</button>`;
+                container.innerHTML += `<button class="btn btn-sm ${btnClass}" onclick="addCharge('${prod.name}', ${prod.price}, '${prod.type}', ${prod.id})">${prod.name} - ${prod.price} ج</button>`;
             });
         }
 
-        let currentSelectedRoom = null;
-
-        function openRoomDetails(roomId, roomName) {
-            currentSelectedRoom = roomId;
-            document.getElementById('roomModalLabel').innerText = `إدارة طلبات - ${roomName}`;
-            loadRoomCharges();
-            new bootstrap.Modal(document.getElementById('roomModal')).show();
+        function renderCafeProducts() {
+            const container = document.getElementById('cafeProductsButtons');
+            if (!container) return;
+            container.innerHTML = '';
+            allProducts.filter(p => p.type === 'order').forEach(prod => {
+                container.innerHTML += `<button class="btn btn-outline-dark m-1" onclick="addToCafeCart(${prod.id}, '${prod.name}', ${prod.price}, '${prod.type}')">${prod.name} - ${prod.price} ج</button>`;
+            });
         }
 
         function addCharge(desc, price, type, productId = null) {
@@ -544,9 +861,8 @@
                 type,
                 productId
             }).then((res) => {
-                if (!res.success) {
-                    alert(res.message);
-                } else {
+                if (!res.success) alert(res.message);
+                else {
                     loadRoomCharges();
                     fetchProducts();
                 }
@@ -568,175 +884,65 @@
             if (!list) return;
             list.innerHTML = '';
             ipcRenderer.invoke('get-room-charges', currentSelectedRoom).then((charges) => {
-                if (charges.length === 0) {
-                    list.innerHTML = '<li class="list-group-item text-muted text-center">لا يوجد</li>';
-                    return;
-                }
-                let total = 0;
-                charges.forEach(charge => {
-                    total += charge.price;
-                    list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center">${charge.description}<span class="badge ${charge.type === 'order' ? 'bg-success' : 'bg-danger'} rounded-pill">${charge.price} ج.م</span></li>`;
+                        if (charges.length === 0) {
+                            list.innerHTML = '<li class="list-group-item text-muted text-center">لا يوجد</li>';
+                            return;
+                        }
+                        let total = 0;
+                        charges.forEach(charge => {
+                                    const isPending = charge.status === 'pending_refund';
+                                    const bg = isPending ? 'bg-secondary text-white' : '';
+                                    if (!isPending) total += charge.price;
+                                    list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center ${bg}">
+                        <div>${charge.description} ${isPending ? '<small>(جاري الإلغاء)</small>' : ''}</div>
+                        <div><span class="badge ${charge.type === 'order' ? 'bg-success' : 'bg-danger'} rounded-pill me-2">${charge.price} ج</span> ${!isPending ? `<button class="btn btn-sm btn-outline-danger py-0 px-1" title="مرتجع" onclick="requestRefund('charge', ${charge.id}, '${charge.description}', ${charge.price})">🗑️</button>` : ''}</div>
+                    </li>`; 
                 });
                 list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center fw-bold bg-light mt-2">إجمالي الطلبات<span class="text-dark">${total} ج.م</span></li>`;
             });
         }
 
-        function checkShiftStatus() {
-            ipcRenderer.invoke('check-active-shift').then((shift) => {
-                const overlay = document.getElementById('shiftOverlay');
-                const endBtn = document.getElementById('endShiftBtn');
-                if (shift) {
-                    currentShift = shift;
-                    document.getElementById('currentCashierDisplay').innerText = `(كاشير: ${shift.cashier_name})`;
-                    overlay.style.display = 'none';
-                    endBtn.style.display = 'inline-block';
-                } else {
-                    overlay.style.display = 'flex';
-                    document.getElementById('currentCashierDisplay').innerText = '';
-                    endBtn.style.display = 'none';
-                }
+        setInterval(() => {
+            const now = new Date();
+            allRoomsList.forEach(room => {
+                const roomCard = document.getElementById(`room-${room.id}`); if (!roomCard) return;
+                const timerDiv = roomCard.querySelector('.timer');
+                const session = activeRooms[room.id];
+                
+                if (session) {
+                    const startTime = new Date(session.startTime.replace(' ', 'T')); const diff = Math.floor((now - startTime) / 1000);
+                    if (session.targetMinutes > 0) {
+                        const remSecs = (session.targetMinutes * 60) - diff;
+                        if (remSecs <= 0) {
+                            roomCard.classList.add('blink-alarm'); playBeep(room.id);
+                            if(!roomCard.querySelector('.mute-btn')) { timerDiv.innerHTML = `<span class="text-danger">انتهى الوقت!</span><br><button class="btn btn-sm btn-dark mt-2 mute-btn" onclick="event.stopPropagation(); stopBeep(${room.id}); this.remove(); roomCard.classList.remove('blink-alarm');">إسكات 🔇</button>`; }
+                        } else { timerDiv.innerText = `متبقي: ${Math.floor(remSecs / 3600).toString().padStart(2, '0')}:${Math.floor((remSecs % 3600) / 60).toString().padStart(2, '0')}:${(remSecs % 60).toString().padStart(2, '0')}`; }
+                    } else { timerDiv.innerText = `${Math.floor(diff / 3600).toString().padStart(2, '0')}:${Math.floor((diff % 3600) / 60).toString().padStart(2, '0')}:${(diff % 60).toString().padStart(2, '0')}`; }
+                } else { timerDiv.innerText = "00:00:00"; roomCard.classList.remove('blink-alarm'); stopBeep(room.id); }
             });
-        }
+        }, 1000);
 
-        function startNewShift() {
-            const nameInput = document.getElementById('cashierNameInput').value.trim();
-            if (!nameInput) return;
-            ipcRenderer.invoke('start-shift', nameInput).then((shift) => {
-                currentShift = shift;
-                document.getElementById('currentCashierDisplay').innerText = `(كاشير: ${shift.cashier_name})`;
-                document.getElementById('shiftOverlay').style.display = 'none';
-                document.getElementById('endShiftBtn').style.display = 'inline-block';
-                document.getElementById('cashierNameInput').value = '';
-            });
-        }
-
+        function checkShiftStatus() { ipcRenderer.invoke('check-active-shift').then((shift) => { const overlay = document.getElementById('shiftOverlay'); const endBtn = document.getElementById('endShiftBtn'); if (shift) { currentShift = shift; document.getElementById('currentCashierDisplay').innerText = `(كاشير: ${shift.cashier_name})`; overlay.style.display = 'none'; endBtn.style.display = 'inline-block'; } else { overlay.style.display = 'flex'; document.getElementById('currentCashierDisplay').innerText = ''; endBtn.style.display = 'none'; } }); }
+        function startNewShift() { const nameInput = document.getElementById('cashierNameInput').value.trim(); if (!nameInput) return; ipcRenderer.invoke('start-shift', nameInput).then((shift) => { currentShift = shift; document.getElementById('currentCashierDisplay').innerText = `(كاشير: ${shift.cashier_name})`; document.getElementById('shiftOverlay').style.display = 'none'; document.getElementById('endShiftBtn').style.display = 'inline-block'; document.getElementById('cashierNameInput').value = ''; }); }
         function endCurrentShift() {
-            if (confirm('تأكيد التقفيل؟')) {
+            if (confirm('تأكيد تقفيل الوردية؟')) {
                 ipcRenderer.invoke('end-shift').then((res) => {
                     if (res.success) {
-                        document.getElementById('repCashierName').innerText = res.cashierName;
-                        document.getElementById('repShiftTime').innerText = `${res.totalTime} ج.م`;
-                        document.getElementById('repShiftOrders').innerText = `${res.totalOrders} ج.م`;
-                        document.getElementById('repShiftPenaltiesTotal').innerText = `${res.totalPenalties} ج.م`;
-                        document.getElementById('repShiftTotal').innerText = res.totalSales;
+                        document.getElementById('repCashierName').innerText = res.cashierName; document.getElementById('repShiftTotal').innerText = res.totalSales; document.getElementById('repTotalHours').innerText = res.detailsObj.totalHours;
+                        const soldList = document.getElementById('repSoldItemsList'); soldList.innerHTML = '';
+                        if(res.detailsObj.soldItems.length > 0) { res.detailsObj.soldItems.forEach(item => { soldList.innerHTML += `<li><span class="text-primary fw-bold">${item.qty}x</span> ${item.description}</li>`; }); } else { soldList.innerHTML = '<li class="text-muted">لم يتم بيع منتجات</li>'; }
                         new bootstrap.Modal(document.getElementById('shiftReportModal')).show();
                     }
                 });
             }
         }
-
-        function closeShiftReportAndLock() {
-            bootstrap.Modal.getInstance(document.getElementById('shiftReportModal')).hide();
-            currentShift = null;
-            document.getElementById('currentCashierDisplay').innerText = '';
-            document.getElementById('endShiftBtn').style.display = 'none';
-            document.getElementById('shiftOverlay').style.display = 'flex';
-        }
-
-        setInterval(() => {
-            const now = new Date();
-            allRoomsList.forEach(room => {
-                const roomCard = document.getElementById(`room-${room.id}`);
-                if (!roomCard) return;
-                const timerDiv = roomCard.querySelector('.timer');
-                if (activeRooms[room.id]) {
-                    const startTime = new Date(activeRooms[room.id].replace(' ', 'T'));
-                    const diff = Math.floor((now - startTime) / 1000);
-                    timerDiv.innerText = `${Math.floor(diff / 3600).toString().padStart(2, '0')}:${Math.floor((diff % 3600) / 60).toString().padStart(2, '0')}:${(diff % 60).toString().padStart(2, '0')}`;
-                } else {
-                    timerDiv.innerText = "00:00:00";
-                }
-            });
-        }, 1000);
-
-        let barcodeBuffer = '';
-        document.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const roomId = parseInt(barcodeBuffer);
-                const roomObj = allRoomsList.find(r => r.id === roomId);
-                if (roomObj) {
-                    ipcRenderer.invoke('toggle-room', roomId).then((res) => {
-                        if (res.status === 'started') {
-                            activeRooms[roomId] = res.startTime;
-                            renderRooms();
-                        } else {
-                            delete activeRooms[roomId];
-                            document.getElementById('invRoomNumber').innerText = res.bill.roomName;
-                            // تم التعويض عن المدة الفعلية بالمدة المحسوبة فقط لتظهر للزبون
-                            document.getElementById('invBilledMinutes').innerText = `${res.bill.billedMinutes} دقيقة`;
-                            document.getElementById('invTimeCost').innerText = `${res.bill.timeCost} ج.م`;
-                            document.getElementById('invTotal').innerText = res.bill.total;
-
-                            const invList = document.getElementById('invChargesList');
-                            invList.innerHTML = '';
-                            if (res.bill.chargesDetails && res.bill.chargesDetails.length > 0) {
-                                res.bill.chargesDetails.forEach(c => {
-                                    invList.innerHTML += `<li class="d-flex justify-content-between mb-1"><span>${c.description}</span> <span>${c.price} ج.م</span></li>`;
-                                });
-                            } else {
-                                invList.innerHTML = '<li class="text-center text-muted">لا يوجد طلبات</li>';
-                            }
-
-                            new bootstrap.Modal(document.getElementById('invoiceModal')).show();
-                            renderRooms();
-                        }
-                    });
-                }
-                barcodeBuffer = '';
-            } else {
-                barcodeBuffer += e.key;
-            }
-        });
-
+        function closeShiftReportAndLock() { window.print(); bootstrap.Modal.getInstance(document.getElementById('shiftReportModal')).hide(); currentShift = null; document.getElementById('currentCashierDisplay').innerText = ''; document.getElementById('endShiftBtn').style.display = 'none'; document.getElementById('shiftOverlay').style.display = 'flex'; }
         function loadAdminDashboard() {
-            ipcRenderer.invoke('get-daily-reports').then((data) => {
-                document.getElementById('repTotalSales').innerText = `${data.totalSales} ج.م`;
-                document.getElementById('repTotalTime').innerText = `${data.totalTime} ج.م`;
-                document.getElementById('repTotalCharges').innerText = `${data.totalCharges} ج.م`;
-                document.getElementById('repTotalPenalties').innerText = `${data.totalPenalties} ج.م`;
-            });
-            ipcRenderer.invoke('get-shifts-history').then((shifts) => {
-                const tbody = document.getElementById('shiftsHistoryTable');
-                tbody.innerHTML = '';
-                shifts.forEach(s => {
-                    const start = new Date(s.start_time.replace(' ', 'T')).toLocaleString('ar-EG', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    const end = s.end_time ? new Date(s.end_time.replace(' ', 'T')).toLocaleString('ar-EG', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }) : 'مستمر';
-                    tbody.innerHTML += `<tr><td class="fw-bold">${s.cashier_name}</td><td>${start}</td><td>${end}</td><td><span class="text-success">${s.totalTime}</span></td><td><span class="text-info">${s.totalOrders}</span></td><td><span class="text-danger">${s.totalPenalties}</span></td><td class="fw-bold">${s.totalSales} ج</td></tr>`;
-                });
-            });
-            ipcRenderer.invoke('get-penalties-log').then((logs) => {
-                const tbody = document.getElementById('penaltiesLogTable');
-                tbody.innerHTML = '';
-                logs.forEach(l => {
-                    const date = new Date(l.end_time.replace(' ', 'T')).toLocaleString('ar-EG', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    tbody.innerHTML += `<tr><td class="fw-bold">غرفة ${l.room_id}</td><td class="text-danger">${l.description}</td><td>${l.price} ج</td><td class="text-muted">${date}</td></tr>`;
-                });
-            });
+            fetchAdminRefunds(); ipcRenderer.invoke('get-daily-reports').then((data) => { document.getElementById('repTotalSales').innerText = `${data.totalSales} ج.م`; document.getElementById('repTotalRefunds').innerText = `${data.totalRefunds} ج.م`; });
+            ipcRenderer.invoke('get-shifts-history').then((shifts) => { const tbody = document.getElementById('shiftsHistoryTable'); tbody.innerHTML = ''; shifts.forEach(s => { const start = new Date(s.start_time.replace(' ', 'T')).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); const end = s.end_time ? new Date(s.end_time.replace(' ', 'T')).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'مستمر'; tbody.innerHTML += `<tr><td class="fw-bold">${s.cashier_name}<br><small class="text-muted">${start}<br>إلى ${end}</small></td><td class="text-start"><span class="badge bg-primary">لعب: ${s.details.totalHours} ساعة</span><br><span class="fw-bold fs-6">الدرج: ${s.totalSales} ج</span></td></tr>`; }); });
         }
-
-        ipcRenderer.invoke('get-active-sessions').then((sessions) => {
-            sessions.forEach(session => {
-                activeRooms[session.room_id] = session.start_time;
-            });
-            fetchRooms();
-        });
-        checkShiftStatus();
-        fetchProducts();
+        ipcRenderer.invoke('get-active-sessions').then((sessions) => { sessions.forEach(s => { activeRooms[s.room_id] = { startTime: s.start_time, playMode: s.play_mode, consoleType: s.console_type, targetMinutes: s.target_minutes, status: s.status }; }); fetchRooms(); });
+        checkShiftStatus(); fetchProducts();
     </script>
 </body>
 
