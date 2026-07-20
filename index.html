@@ -893,8 +893,10 @@
                                     const isPending = charge.status === 'pending_refund';
                                     const bg = isPending ? 'bg-secondary text-white' : '';
                                     if (!isPending) total += charge.price;
+                                    // هنا التعديل: إظهار الكمية الحالية مجمعة داخل الغرفة النشطة لسهولة الجرد
+                                    const qtyText = charge.qty > 1 ? `<span class="badge bg-secondary me-1" style="font-size: 0.7rem;">${charge.qty}x</span> ` : '';
                                     list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center ${bg}">
-                        <div>${charge.description} ${isPending ? '<small>(جاري الإلغاء)</small>' : ''}</div>
+                        <div>${qtyText}${charge.description} ${isPending ? '<small>(جاري الإلغاء)</small>' : ''}</div>
                         <div><span class="badge ${charge.type === 'order' ? 'bg-success' : 'bg-danger'} rounded-pill me-2">${charge.price} ج</span> ${!isPending ? `<button class="btn btn-sm btn-outline-danger py-0 px-1" title="مرتجع" onclick="requestRefund('charge', ${charge.id}, '${charge.description}', ${charge.price})">🗑️</button>` : ''}</div>
                     </li>`; 
                 });
@@ -937,10 +939,41 @@
             }
         }
         function closeShiftReportAndLock() { window.print(); bootstrap.Modal.getInstance(document.getElementById('shiftReportModal')).hide(); currentShift = null; document.getElementById('currentCashierDisplay').innerText = ''; document.getElementById('endShiftBtn').style.display = 'none'; document.getElementById('shiftOverlay').style.display = 'flex'; }
+        
+        // هنا التعديل: ربط وتحديث شاشة المدير بالكامل لحل مشكلة الـ 0 أو الـ undefined المزعجة
         function loadAdminDashboard() {
-            fetchAdminRefunds(); ipcRenderer.invoke('get-daily-reports').then((data) => { document.getElementById('repTotalSales').innerText = `${data.totalSales} ج.م`; document.getElementById('repTotalRefunds').innerText = `${data.totalRefunds} ج.م`; });
-            ipcRenderer.invoke('get-shifts-history').then((shifts) => { const tbody = document.getElementById('shiftsHistoryTable'); tbody.innerHTML = ''; shifts.forEach(s => { const start = new Date(s.start_time.replace(' ', 'T')).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); const end = s.end_time ? new Date(s.end_time.replace(' ', 'T')).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'مستمر'; tbody.innerHTML += `<tr><td class="fw-bold">${s.cashier_name}<br><small class="text-muted">${start}<br>إلى ${end}</small></td><td class="text-start"><span class="badge bg-primary">لعب: ${s.details.totalHours} ساعة</span><br><span class="fw-bold fs-6">الدرج: ${s.totalSales} ج</span></td></tr>`; }); });
+    fetchAdminRefunds(); 
+    
+    // جلب البيانات وتحديث الكروت العلوية فوراً
+    ipcRenderer.invoke('get-daily-reports').then((data) => {
+        console.log("Frontend received data:", data); // هيطبع لك القيمة في نافذة الـ DevTools المفتوحة
+        document.getElementById('repTotalSales').innerText = `${data.totalSales || 0} ج.م`; 
+        document.getElementById('repTotalRefunds').innerText = `${data.totalRefunds || 0} ج.م`; 
+    }).catch(err => console.error("Error loading daily reports:", err));
+
+    // جلب وعرض سجل الورديات المغلقة
+    ipcRenderer.invoke('get-shifts-history').then((shifts) => { 
+        const tbody = document.getElementById('shiftsHistoryTable'); 
+        tbody.innerHTML = ''; 
+        if (shifts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-muted">لا يوجد ورديات مقفولة مسجلة</td></tr>';
+            return;
         }
+        shifts.forEach(s => { 
+            const start = new Date((s.start_time || '').replace(' ', 'T')).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); 
+            const end = s.end_time ? new Date(s.end_time.replace(' ', 'T')).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'مستمر'; 
+            const shiftSalesAmt = s.details && s.details.totalSales ? s.details.totalSales : (s.totalSales || 0);
+            
+            tbody.innerHTML += `<tr>
+                <td class="fw-bold">${s.cashier_name}<br><small class="text-muted">${start}<br>إلى ${end}</small></td>
+                <td class="text-start">
+                    <span class="badge bg-primary">لعب: ${s.details.totalHours || 0} ساعة</span><br>
+                    <span class="fw-bold fs-6">الدرج: ${shiftSalesAmt} ج</span>
+                </td>
+            </tr>`; 
+        }); 
+    }).catch(err => console.error("Error loading shifts history:", err));
+}
         ipcRenderer.invoke('get-active-sessions').then((sessions) => { sessions.forEach(s => { activeRooms[s.room_id] = { startTime: s.start_time, playMode: s.play_mode, consoleType: s.console_type, targetMinutes: s.target_minutes, status: s.status }; }); fetchRooms(); });
         checkShiftStatus(); fetchProducts();
     </script>

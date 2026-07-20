@@ -8,6 +8,9 @@ function createWindow() {
     const win = new BrowserWindow({ width: 1200, height: 850, webPreferences: { nodeIntegration: true, contextIsolation: false } });
     win.loadFile('index.html');
     win.maximize();
+
+    // سطر سحري لفتح الـ DevTools عشان تشوف لو فيه خطأ في الـ UI
+    win.webContents.openDevTools();
 }
 
 const getLocalNow = () => {
@@ -149,7 +152,6 @@ ipcMain.handle('process-refund', (e, { reqId, action }) => {
         if (req.type === 'charge') {
             db.prepare(`UPDATE session_charges SET status = 'refunded' WHERE id = ?`).run(req.reference_id);
             const charge = db.prepare(`SELECT product_id FROM session_charges WHERE id = ?`).get(req.reference_id);
-            // التأكد من استرجاع المخزن فقط لو كان معدود
             if (charge && charge.product_id) db.prepare(`UPDATE products SET stock = stock + 1 WHERE id = ? AND is_countable = 1`).run(charge.product_id);
         }
         if (req.type === 'session') {
@@ -169,7 +171,6 @@ ipcMain.handle('void-room', (e, { roomId, voidType }) => {
     const shift = db.prepare(`SELECT id FROM shifts WHERE status = 'active'`).get();
     const nowStr = getLocalNow();
 
-    // حساب تكلفة الوقت
     db.prepare(`UPDATE session_intervals SET end_time = ? WHERE session_id = ? AND end_time IS NULL`).run(nowStr, activeSession.id);
     const intervals = db.prepare(`SELECT * FROM session_intervals WHERE session_id = ?`).all(activeSession.id);
     let totalActualMins = 0;
@@ -244,40 +245,44 @@ ipcMain.handle('end-shift', () => {
     const directSales = db.prepare(`SELECT SUM(price) as total FROM direct_orders WHERE shift_id = ? AND status = 'active'`).get(shift.id).total || 0;
     const totalAllSales = shiftSales + directSales;
 
-    const detailsJson = JSON.stringify({ totalHours: (totalMins / 60).toFixed(1), soldItems });
+    // تم إضافة مجموع المبيعات داخل تفاصيل الشيفت لحفظه وتجنب ظهور خانة فارغة في السجل لاحقاً
+    const detailsJson = JSON.stringify({ totalHours: (totalMins / 60).toFixed(1), soldItems, totalSales: Math.round(totalAllSales) });
     db.prepare(`UPDATE shifts SET end_time = ?, status = 'closed', shift_details = ? WHERE id = ?`).run(getLocalNow(), detailsJson, shift.id);
 
     return { success: true, cashierName: shift.cashier_name, totalSales: Math.round(totalAllSales), detailsObj: JSON.parse(detailsJson) };
 });
 
-ipcMain.handle('verify-password', (e, pwd) => { const r = db.prepare(`SELECT value FROM settings WHERE key = 'admin_password'`).get(); return pwd === (r ? r.value : '1234'); });
+ipcMain.handle('verify-password', (e, pwd) => {
+    const result = db.prepare(`SELECT value FROM settings WHERE key = 'admin_password'`).get();
+    return pwd === (result ? result.value : '1234');
+});
 ipcMain.handle('update-password', (e, pwd) => { db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password', ?)`).run(pwd.toString()); return { success: true }; });
+
 ipcMain.handle('get-daily-reports', () => {
-    // نجيب الشفت المفتوح حالياً عشان نربط بيه
     const activeShift = db.prepare(`SELECT id FROM shifts WHERE status = 'active'`).get();
     if (!activeShift) return { totalSales: 0, totalRefunds: 0 };
 
-    // 1. حساب مبيعات الغرف (Sessions) الخاصة بالشفت المفتوح
     const sSales = db.prepare(`
         SELECT SUM(total_price) as total FROM sessions 
         WHERE status = 'closed' AND start_time >= (SELECT start_time FROM shifts WHERE id = ?)
     `).get(activeShift.id).total || 0;
 
-    // 2. حساب مبيعات الكافيتريا (Direct Orders) الخاصة بنفس الشفت
     const dSales = db.prepare(`
         SELECT SUM(price) as total FROM direct_orders 
         WHERE shift_id = ? AND status = 'active'
     `).get(activeShift.id).total || 0;
 
-    // 3. حساب المرتجعات المعتمدة
     const ref = db.prepare(`
         SELECT SUM(amount) as total FROM refund_requests 
         WHERE status = 'approved' AND shift_id = ?
     `).get(activeShift.id).total || 0;
 
-    console.log("Debug Sales:", { sSales, dSales, ref }); // افتح الـ Terminal عشان تشوف الأرقام دي
+    console.log("Debug Sales:", { sSales, dSales, ref });
     return { totalSales: Math.round(sSales + dSales), totalRefunds: Math.round(ref) };
 });
-ipcMain.handle('get-shifts-history', () => { return db.prepare(`SELECT * FROM shifts WHERE status = 'closed' ORDER BY start_time DESC`).all().map(s => ({...s, details: s.shift_details ? JSON.parse(s.shift_details) : { totalHours: 0, soldItems: [] } })); });
+
+ipcMain.handle('get-shifts-history', () => {
+    return db.prepare(`SELECT * FROM shifts WHERE status = 'closed' ORDER BY start_time DESC`).all().map(s => ({...s, details: s.shift_details ? JSON.parse(s.shift_details) : { totalHours: 0, soldItems: [], totalSales: 0 } }));
+});
 
 app.whenReady().then(createWindow);
