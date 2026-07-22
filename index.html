@@ -3,9 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
     <title>نظام إدارة البلايستيشن - JUNRO</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
             background-color: #f8f9fa;
@@ -123,7 +123,7 @@
             module = undefined;
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/bootstrap.bundle.min.js"></script>
     <script>
         if (window.tempModule) {
             module = window.tempModule;
@@ -277,7 +277,6 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-8 border-end">
-                            <!-- خانة إدخال صنف حر للكافيتريا -->
                             <div class="input-group mb-3 border-bottom pb-3">
                                 <input type="text" id="cafeCustomDesc" class="form-control" placeholder="صنف حر/غرامة خارجية">
                                 <input type="number" id="cafeCustomPrice" class="form-control" placeholder="السعر" style="max-width: 100px;">
@@ -296,22 +295,27 @@
         </div>
     </div>
 
-    <!-- نافذة تشغيل الغرفة / المحاكي -->
+    <!-- نافذة تشغيل الغرفة / المحاكي (محدثة بالأسعار التفصيلية للأزرار) -->
     <div class="modal fade" id="startRoomModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content text-center p-3">
                 <h5 class="mb-3 border-bottom pb-2">تشغيل <span id="startRoomName" class="text-primary fw-bold"></span></h5>
                 <div id="psStartOptions" class="row g-2">
-                    <div class="col-6"><button class="btn btn-outline-primary w-100 py-3" onclick="executeStartRoom('PS4', 'single', 0)"><strong>PS4</strong><br>👤 فردي</button></div>
-                    <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="executeStartRoom('PS4', 'multi', 0)"><strong>PS4</strong><br>👥 Multi</button></div>
-                    <div class="col-6"><button class="btn btn-outline-danger w-100 py-3" onclick="executeStartRoom('PS5', 'single', 0)"><strong>PS5</strong><br>👤 فردي</button></div>
-                    <div class="col-6"><button class="btn btn-danger w-100 py-3" onclick="executeStartRoom('PS5', 'multi', 0)"><strong>PS5</strong><br>👥 Multi</button></div>
+                    <div class="col-6"><button id="btnPs4Single" class="btn btn-outline-primary w-100 py-3" onclick="executeStartRoom('PS4', 'single', 0)"><strong>PS4</strong><br>👤 فردي</button></div>
+                    <div class="col-6"><button id="btnPs4Multi" class="btn btn-primary w-100 py-3" onclick="executeStartRoom('PS4', 'multi', 0)"><strong>PS4</strong><br>👥 Multi</button></div>
+                    <div class="col-6"><button id="btnPs5Single" class="btn btn-outline-danger w-100 py-3" onclick="executeStartRoom('PS5', 'single', 0)"><strong>PS5</strong><br>👤 فردي</button></div>
+                    <div class="col-6"><button id="btnPs5Multi" class="btn btn-danger w-100 py-3" onclick="executeStartRoom('PS5', 'multi', 0)"><strong>PS5</strong><br>👥 Multi</button></div>
                 </div>
                 <div id="simStartOptions" style="display:none;">
-                    <p class="text-muted mb-2">اختر نظام الدفع:</p>
+                    <p class="text-primary fw-bold mb-2" id="simPriceDisplay"></p>
                     <button class="btn btn-success w-100 py-2 mb-2 fw-bold" onclick="executeStartRoom('SIM', 'single', 0)">♾️ وقت مفتوح (مفتوح)</button>
                     <div class="input-group">
-                        <select id="simTargetMinutesInput" class="form-select"><option value="30">نصف ساعة (30 د)</option><option value="60">ساعة (60 د)</option><option value="90">ساعة ونصف (90 د)</option><option value="120">ساعتين (120 د)</option></select>
+                        <select id="simTargetMinutesInput" class="form-select">
+                            <option value="30">نصف ساعة (30 د)</option>
+                            <option value="60">ساعة (60 د)</option>
+                            <option value="90">ساعة ونصف (90 د)</option>
+                            <option value="120">ساعتين (120 د)</option>
+                        </select>
                         <button class="btn btn-warning fw-bold" onclick="startSimLimited()">⏱️ تشغيل بوقت</button>
                     </div>
                 </div>
@@ -328,7 +332,6 @@
                     <div id="roomModeSwitchArea"></div>
                 </div>
                 <div class="modal-body">
-                    <!-- خانة الصنف الحر داخل الغرفة -->
                     <div class="input-group mb-3 border-bottom pb-3">
                         <input type="text" id="customDesc" class="form-control" placeholder="صنف حر/تالف/غرامة">
                         <input type="number" id="customPrice" class="form-control" placeholder="السعر" style="max-width: 100px;">
@@ -612,7 +615,7 @@
             });
         }
 
-        // --- إدارة الغرف ---
+        // --- إدارة الغرف وتوليد العرض ---
         function toggleRoomTypeInputs() {
             const type = document.getElementById('newRoomType').value;
             if (type === 'PS') {
@@ -667,6 +670,7 @@
             if (confirm("حذف؟")) ipcRenderer.invoke('delete-room', id).then(() => fetchRooms());
         }
 
+        // عرض الكروت في الشاشة الرئيسية مضاف إليها كارت أسعار موضح للكاشير
         function renderRooms() {
             const container = document.getElementById('rooms-container');
             container.innerHTML = '';
@@ -678,16 +682,28 @@
                 let cardClass = isBusy ? 'status-busy' : 'status-available';
                 let statusText = isBusy ? `مشغول (${modeText})` : 'متاح';
 
+                let priceTag = '';
+                if (room.device_type === 'SIM') {
+                    priceTag = `<div class="mt-2 pt-2 border-top text-dark fw-bold" style="font-size:0.8rem;">سعر الساعة: ${room.sim_price} ج</div>`;
+                } else {
+                    priceTag = `<div class="mt-2 pt-2 border-top text-dark" style="font-size:0.75rem;">
+                        <strong>PS4:</strong> ${room.ps4_single}ف / ${room.ps4_multi}م | <strong>PS5:</strong> ${room.ps5_single}ف / ${room.ps5_multi}م
+                    </div>`;
+                }
+
                 container.innerHTML += `
                 <div class="col-md-3">
                     <div class="card room-card ${cardClass} text-center p-3" id="room-${room.id}" onclick="handleRoomClick(${room.id})">
-                        <h4 class="card-title mb-1">${icon} ${room.name}</h4><p class="card-text mb-1 fw-bold" style="font-size:0.85rem;">${statusText}</p>
+                        <h4 class="card-title mb-1">${icon} ${room.name}</h4>
+                        <p class="card-text mb-1 fw-bold" style="font-size:0.85rem;">${statusText}</p>
                         <div class="timer mt-1" style="font-size:1.2rem;">00:00:00</div>
+                        ${priceTag}
                     </div>
                 </div>`;
             });
         }
 
+        // عند الضغط على الغرفة للتشغيل: يتم تحديث قيم الأسعار على أزرار الاختيار مباشرة للكاشير
         function handleRoomClick(roomId) {
             initAudio();
             const roomObj = allRoomsList.find(r => r.id === roomId);
@@ -709,9 +725,15 @@
                 if (roomObj.device_type === 'SIM') {
                     document.getElementById('psStartOptions').style.display = 'none';
                     document.getElementById('simStartOptions').style.display = 'block';
+                    document.getElementById('simPriceDisplay').innerText = `سعر الساعة: ${roomObj.sim_price} ج.م`;
                 } else {
                     document.getElementById('psStartOptions').style.display = 'flex';
                     document.getElementById('simStartOptions').style.display = 'none';
+
+                    document.getElementById('btnPs4Single').innerHTML = `<strong>PS4</strong><br>👤 فردي (${roomObj.ps4_single} ج/س)`;
+                    document.getElementById('btnPs4Multi').innerHTML = `<strong>PS4</strong><br>👥 Multi (${roomObj.ps4_multi} ج/س)`;
+                    document.getElementById('btnPs5Single').innerHTML = `<strong>PS5</strong><br>👤 فردي (${roomObj.ps5_single} ج/س)`;
+                    document.getElementById('btnPs5Multi').innerHTML = `<strong>PS5</strong><br>👥 Multi (${roomObj.ps5_multi} ج/س)`;
                 }
                 new bootstrap.Modal(document.getElementById('startRoomModal')).show();
             }
@@ -772,7 +794,7 @@
                     const invInt = document.getElementById('invIntervalsList');
                     invInt.innerHTML = '';
                     res.bill.intervalsDetails.forEach(inv => {
-                        invInt.innerHTML += `<li>- ${inv.mode} (${inv.actualMins} دقيقة) <span class="float-end">${inv.cost} ج</span></li>`;
+                        invInt.innerHTML += `<li>- ${inv.mode} (${inv.billedMins} دقيقة) <span class="float-end">${inv.cost} ج</span></li>`;
                     });
                     document.getElementById('invTimeCost').innerText = `${res.bill.timeCost} ج.م`;
                     document.getElementById('invTotal').innerText = res.bill.total;
@@ -893,7 +915,6 @@
                                     const isPending = charge.status === 'pending_refund';
                                     const bg = isPending ? 'bg-secondary text-white' : '';
                                     if (!isPending) total += charge.price;
-                                    // هنا التعديل: إظهار الكمية الحالية مجمعة داخل الغرفة النشطة لسهولة الجرد
                                     const qtyText = charge.qty > 1 ? `<span class="badge bg-secondary me-1" style="font-size: 0.7rem;">${charge.qty}x</span> ` : '';
                                     list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center ${bg}">
                         <div>${qtyText}${charge.description} ${isPending ? '<small>(جاري الإلغاء)</small>' : ''}</div>
@@ -940,40 +961,37 @@
         }
         function closeShiftReportAndLock() { window.print(); bootstrap.Modal.getInstance(document.getElementById('shiftReportModal')).hide(); currentShift = null; document.getElementById('currentCashierDisplay').innerText = ''; document.getElementById('endShiftBtn').style.display = 'none'; document.getElementById('shiftOverlay').style.display = 'flex'; }
         
-        // هنا التعديل: ربط وتحديث شاشة المدير بالكامل لحل مشكلة الـ 0 أو الـ undefined المزعجة
         function loadAdminDashboard() {
-    fetchAdminRefunds(); 
-    
-    // جلب البيانات وتحديث الكروت العلوية فوراً
-    ipcRenderer.invoke('get-daily-reports').then((data) => {
-        console.log("Frontend received data:", data); // هيطبع لك القيمة في نافذة الـ DevTools المفتوحة
-        document.getElementById('repTotalSales').innerText = `${data.totalSales || 0} ج.م`; 
-        document.getElementById('repTotalRefunds').innerText = `${data.totalRefunds || 0} ج.م`; 
-    }).catch(err => console.error("Error loading daily reports:", err));
-
-    // جلب وعرض سجل الورديات المغلقة
-    ipcRenderer.invoke('get-shifts-history').then((shifts) => { 
-        const tbody = document.getElementById('shiftsHistoryTable'); 
-        tbody.innerHTML = ''; 
-        if (shifts.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="2" class="text-muted">لا يوجد ورديات مقفولة مسجلة</td></tr>';
-            return;
-        }
-        shifts.forEach(s => { 
-            const start = new Date((s.start_time || '').replace(' ', 'T')).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); 
-            const end = s.end_time ? new Date(s.end_time.replace(' ', 'T')).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'مستمر'; 
-            const shiftSalesAmt = s.details && s.details.totalSales ? s.details.totalSales : (s.totalSales || 0);
+            fetchAdminRefunds(); 
             
-            tbody.innerHTML += `<tr>
-                <td class="fw-bold">${s.cashier_name}<br><small class="text-muted">${start}<br>إلى ${end}</small></td>
-                <td class="text-start">
-                    <span class="badge bg-primary">لعب: ${s.details.totalHours || 0} ساعة</span><br>
-                    <span class="fw-bold fs-6">الدرج: ${shiftSalesAmt} ج</span>
-                </td>
-            </tr>`; 
-        }); 
-    }).catch(err => console.error("Error loading shifts history:", err));
-}
+            ipcRenderer.invoke('get-daily-reports').then((data) => {
+                document.getElementById('repTotalSales').innerText = `${data.totalSales || 0} ج.م`; 
+                document.getElementById('repTotalRefunds').innerText = `${data.totalRefunds || 0} ج.م`; 
+            }).catch(err => console.error("Error loading daily reports:", err));
+
+            ipcRenderer.invoke('get-shifts-history').then((shifts) => { 
+                const tbody = document.getElementById('shiftsHistoryTable'); 
+                tbody.innerHTML = ''; 
+                if (shifts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="2" class="text-muted">لا يوجد ورديات مقفولة مسجلة</td></tr>';
+                    return;
+                }
+                shifts.forEach(s => { 
+                    const start = new Date((s.start_time || '').replace(' ', 'T')).toLocaleString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); 
+                    const end = s.end_time ? new Date(s.end_time.replace(' ', 'T')).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'مستمر'; 
+                    const shiftSalesAmt = s.details && s.details.totalSales ? s.details.totalSales : (s.totalSales || 0);
+                    
+                    tbody.innerHTML += `<tr>
+                        <td class="fw-bold">${s.cashier_name}<br><small class="text-muted">${start}<br>إلى ${end}</small></td>
+                        <td class="text-start">
+                            <span class="badge bg-primary">لعب: ${s.details.totalHours || 0} ساعة</span><br>
+                            <span class="fw-bold fs-6">الدرج: ${shiftSalesAmt} ج</span>
+                        </td>
+                    </tr>`; 
+                }); 
+            }).catch(err => console.error("Error loading shifts history:", err));
+        }
+
         ipcRenderer.invoke('get-active-sessions').then((sessions) => { sessions.forEach(s => { activeRooms[s.room_id] = { startTime: s.start_time, playMode: s.play_mode, consoleType: s.console_type, targetMinutes: s.target_minutes, status: s.status }; }); fetchRooms(); });
         checkShiftStatus(); fetchProducts();
     </script>

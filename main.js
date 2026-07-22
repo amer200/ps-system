@@ -5,12 +5,16 @@ const db = require('./database');
 app.disableHardwareAcceleration();
 
 function createWindow() {
-    const win = new BrowserWindow({ width: 1200, height: 850, webPreferences: { nodeIntegration: true, contextIsolation: false } });
+    const win = new BrowserWindow({
+        width: 1200,
+        height: 850,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
     win.loadFile('index.html');
     win.maximize();
-
-    // سطر سحري لفتح الـ DevTools عشان تشوف لو فيه خطأ في الـ UI
-    win.webContents.openDevTools();
 }
 
 const getLocalNow = () => {
@@ -63,21 +67,21 @@ ipcMain.handle('toggle-room', (event, { roomId, playMode = 'single', consoleType
             totalBilledMins = Math.max(30, Math.ceil((totalActualMins - 5) / 30) * 30);
             if (totalActualMins <= 5) totalBilledMins = 30;
             timeCost = (totalBilledMins / 60) * roomData.sim_price;
-            intervalsDetails.push({ mode: 'محاكي قيادة', actualMins: totalActualMins, cost: Math.round(timeCost) });
+            intervalsDetails.push({ mode: 'محاكي قيادة', billedMins: totalBilledMins, cost: Math.round(timeCost) });
         } else {
             totalBilledMins = 60;
             if (totalActualMins >= 75) { totalBilledMins = 60 + Math.floor((totalActualMins - 60 + 15) / 30) * 30; }
             intervals.forEach(inv => {
                 const ratio = inv.actualMins / totalActualMins;
-                const billedForInv = totalBilledMins * ratio;
+                const billedForInv = Math.round(totalBilledMins * ratio);
                 let rate = 0;
                 if (activeSession.console_type === 'PS4' && inv.play_mode === 'single') rate = roomData.ps4_single;
                 if (activeSession.console_type === 'PS4' && inv.play_mode === 'multi') rate = roomData.ps4_multi;
                 if (activeSession.console_type === 'PS5' && inv.play_mode === 'single') rate = roomData.ps5_single;
                 if (activeSession.console_type === 'PS5' && inv.play_mode === 'multi') rate = roomData.ps5_multi;
-                const cost = (billedForInv / 60) * rate;
+                const cost = ((totalBilledMins * ratio) / 60) * rate;
                 timeCost += cost;
-                intervalsDetails.push({ mode: inv.play_mode === 'multi' ? 'Multi' : 'فردي', actualMins: inv.actualMins, cost: Math.round(cost) });
+                intervalsDetails.push({ mode: inv.play_mode === 'multi' ? 'Multi' : 'فردي', billedMins: billedForInv, cost: Math.round(cost) });
             });
         }
 
@@ -245,7 +249,6 @@ ipcMain.handle('end-shift', () => {
     const directSales = db.prepare(`SELECT SUM(price) as total FROM direct_orders WHERE shift_id = ? AND status = 'active'`).get(shift.id).total || 0;
     const totalAllSales = shiftSales + directSales;
 
-    // تم إضافة مجموع المبيعات داخل تفاصيل الشيفت لحفظه وتجنب ظهور خانة فارغة في السجل لاحقاً
     const detailsJson = JSON.stringify({ totalHours: (totalMins / 60).toFixed(1), soldItems, totalSales: Math.round(totalAllSales) });
     db.prepare(`UPDATE shifts SET end_time = ?, status = 'closed', shift_details = ? WHERE id = ?`).run(getLocalNow(), detailsJson, shift.id);
 
@@ -277,7 +280,6 @@ ipcMain.handle('get-daily-reports', () => {
         WHERE status = 'approved' AND shift_id = ?
     `).get(activeShift.id).total || 0;
 
-    console.log("Debug Sales:", { sSales, dSales, ref });
     return { totalSales: Math.round(sSales + dSales), totalRefunds: Math.round(ref) };
 });
 
